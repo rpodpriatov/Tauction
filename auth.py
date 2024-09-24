@@ -2,7 +2,7 @@ from quart import Blueprint, request, jsonify, render_template, redirect, url_fo
 from quart_auth import login_user, logout_user, login_required, current_user
 from models import User
 from sqlalchemy.future import select
-from db import async_session  # Import from db.py
+from db import async_session
 import hmac
 import hashlib
 import time
@@ -34,10 +34,10 @@ async def telegram_auth():
         return jsonify({'error': 'Invalid authentication'}), 401
 
     async with async_session() as session:
-        result = await session.execute(select(User).filter_by(telegram_id=telegram_id))
-        user = result.scalars().first()
+        result = await session.execute(select(User).filter_by(telegram_id=str(telegram_id)))
+        user = result.scalar_one_or_none()
         if not user:
-            user = User(telegram_id=telegram_id, username=username)
+            user = User(telegram_id=str(telegram_id), username=username)
             session.add(user)
             await session.commit()
 

@@ -4,16 +4,30 @@ from telegram import Update, LabeledPrice
 from telegram.ext import Application, CommandHandler, CallbackContext, PreCheckoutQueryHandler, MessageHandler, filters
 from telegram.error import BadRequest
 from models import User, Auction
-from db import async_session  # Import async_session from db.py
+from db import async_session
 from sqlalchemy.future import select
 
-# Set up logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 async def start(update: Update, context: CallbackContext):
     logger.info(f"User {update.effective_user.id} started the bot")
-    await update.message.reply_text('Welcome to the Auction Platform Bot! Use /buy_stars to purchase XTR stars.')
+    await update.message.reply_text('Welcome to the Auction Platform Bot! Use /register to create an account and /buy_stars to purchase XTR stars.')
+
+async def register(update: Update, context: CallbackContext):
+    user_id = update.effective_user.id
+    username = update.effective_user.username
+
+    async with async_session() as session:
+        result = await session.execute(select(User).filter_by(telegram_id=str(user_id)))
+        user = result.scalar_one_or_none()
+        if user:
+            await update.message.reply_text('You are already registered!')
+        else:
+            new_user = User(telegram_id=str(user_id), username=username)
+            session.add(new_user)
+            await session.commit()
+            await update.message.reply_text('Registration successful! You can now use the bot features.')
 
 async def buy_stars(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
@@ -52,7 +66,10 @@ async def successful_payment_callback(update: Update, context: CallbackContext):
             await session.commit()
             await update.message.reply_text(f'Thank you for your payment! {amount} XTR stars have been added to your balance.')
         else:
-            await update.message.reply_text('Error: User not found. Please register on the website first.')
+            new_user = User(telegram_id=str(user_id), username=update.effective_user.username, xtr_balance=amount)
+            session.add(new_user)
+            await session.commit()
+            await update.message.reply_text(f'Thank you for your payment! A new account has been created for you with {amount} XTR stars.')
 
 def setup_bot(app):
     bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
@@ -65,6 +82,7 @@ def setup_bot(app):
         logger.info("Telegram bot initialized successfully")
 
         application.add_handler(CommandHandler('start', start))
+        application.add_handler(CommandHandler('register', register))
         application.add_handler(CommandHandler('buy_stars', buy_stars))
         application.add_handler(PreCheckoutQueryHandler(pre_checkout_callback))
         application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
