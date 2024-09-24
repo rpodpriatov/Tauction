@@ -27,6 +27,9 @@ app.register_blueprint(admin)
 with app.app_context():
     init_db()
 
+# Setup Telegram bot
+bot_application = setup_bot(app)
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -79,5 +82,4 @@ def shutdown_session(exception=None):
 
 if __name__ == '__main__':
     logging.basicConfig(filename='app.log', level=logging.INFO)
-    bot_application = setup_bot(app)
     app.run(host='0.0.0.0', port=5000)
