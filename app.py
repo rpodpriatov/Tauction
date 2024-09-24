@@ -5,6 +5,9 @@ from config import Config
 from models import db, User, Auction
 from auth import auth
 from admin import admin
+from telegram_bot import setup_bot, send_notification
+import asyncio
+import threading
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -43,7 +46,16 @@ def internal_error(error):
     db.session.rollback()
     return render_template('errors/500.html'), 500
 
+def run_bot(application):
+    asyncio.run(application.run_polling())
+
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
+        bot_application = setup_bot(app)
+    
+    # Run the bot in a separate thread
+    bot_thread = threading.Thread(target=run_bot, args=(bot_application,))
+    bot_thread.start()
+    
     app.run(host='0.0.0.0', port=5000)
