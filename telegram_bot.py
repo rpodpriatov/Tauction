@@ -2,6 +2,7 @@ import os
 import logging
 from telegram import Update, LabeledPrice
 from telegram.ext import Application, CommandHandler, CallbackContext, PreCheckoutQueryHandler, MessageHandler, filters
+from telegram.error import BadRequest
 from models import User, Auction
 from db import async_session  # Import async_session from db.py
 from sqlalchemy.future import select
@@ -21,13 +22,17 @@ async def buy_stars(update: Update, context: CallbackContext):
     description = "Purchase XTR stars for use in auctions"
     payload = "Custom-Payload"
     provider_token = os.environ.get('PAYMENT_PROVIDER_TOKEN')
-    currency = "USD"
-    price = 100  # Price in cents
+    currency = "RUB"
+    price = 10000  # Price in kopecks (100 RUB)
     prices = [LabeledPrice("XTR Stars", price)]
 
-    await context.bot.send_invoice(
-        chat_id, title, description, payload, provider_token, currency, prices
-    )
+    try:
+        await context.bot.send_invoice(
+            chat_id, title, description, payload, provider_token, currency, prices
+        )
+    except BadRequest as e:
+        logger.error(f"Error sending invoice: {e}")
+        await update.message.reply_text("Sorry, there was an error processing your request. Please try again later.")
 
 async def pre_checkout_callback(update: Update, context: CallbackContext):
     query = update.pre_checkout_query
@@ -38,7 +43,7 @@ async def pre_checkout_callback(update: Update, context: CallbackContext):
 
 async def successful_payment_callback(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
-    amount = update.message.successful_payment.total_amount // 100  # Convert cents to dollars
+    amount = update.message.successful_payment.total_amount // 100  # Convert kopecks to rubles
 
     async with current_app.app_context():
         async with async_session() as session:
