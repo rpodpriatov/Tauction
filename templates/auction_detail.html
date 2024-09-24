@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>{{ auction.title }}</h1>
+<p>{{ auction.description }}</p>
+<p>Current Price: {{ auction.current_price }} XTR</p>
+<p>End Time: {{ auction.end_time.strftime('%Y-%m-%d %H:%M:%S') }}</p>
+
+{% if auction.is_active %}
+    <form method="POST" action="{{ url_for('place_bid', auction_id=auction.id) }}">
+        {{ form.hidden_tag() }}
+        {{ form.amount.label }} {{ form.amount() }}
+        {{ form.submit() }}
+    </form>
+{% else %}
+    <p>This auction has ended.</p>
+{% endif %}
+
+<h2>Bid History</h2>
+<ul id="bid-history">
+    <!-- Bid history will be loaded here dynamically -->
+</ul>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Fetch and display bid history
+    function updateBidHistory() {
+        fetch(`/api/auction/${auction.id}/bids`)
+            .then(response => response.json())
+            .then(bids => {
+                const bidHistory = document.getElementById('bid-history');
+                bidHistory.innerHTML = '';
+                bids.forEach(bid => {
+                    const bidElement = document.createElement('li');
+                    bidElement.textContent = `${bid.bidder_username} bid ${bid.amount} XTR at ${new Date(bid.timestamp).toLocaleString()}`;
+                    bidHistory.appendChild(bidElement);
+                });
+            });
+    }
+
+    // Update bid history every 5 seconds
+    updateBidHistory();
+    setInterval(updateBidHistory, 5000);
+</script>
+{% endblock %}

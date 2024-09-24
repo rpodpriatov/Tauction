@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Welcome to the Auction Platform</h1>
+<div id="active-auctions">
+    <h2>Active Auctions</h2>
+    <!-- Auctions will be loaded here dynamically -->
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Fetch and display active auctions
+    fetch('/api/active_auctions')
+        .then(response => response.json())
+        .then(auctions => {
+            const auctionsContainer = document.getElementById('active-auctions');
+            auctions.forEach(auction => {
+                const auctionElement = document.createElement('div');
+                auctionElement.innerHTML = `
+                    <h3>${auction.title}</h3>
+                    <p>Current Price: ${auction.current_price} XTR</p>
+                    <p>Ends at: ${new Date(auction.end_time).toLocaleString()}</p>
+                    <a href="/auction/${auction.id}">View Details</a>
+                `;
+                auctionsContainer.appendChild(auctionElement);
+            });
+        });
+</script>
+{% endblock %}

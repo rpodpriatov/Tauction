@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>User Profile</h1>
+<p>Username: {{ current_user.username }}</p>
+<p>XTR Balance: {{ current_user.xtr_balance }}</p>
+
+<h2>Auction History</h2>
+<div id="auction-history">
+    <!-- Auction history will be loaded here dynamically -->
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Fetch and display auction history
+    fetch('/api/user/auction_history')
+        .then(response => response.json())
+        .then(history => {
+            const historyContainer = document.getElementById('auction-history');
+            
+            const createdAuctions = document.createElement('div');
+            createdAuctions.innerHTML = '<h3>Created Auctions</h3>';
+            history.created.forEach(auction => {
+                createdAuctions.innerHTML += `
+                    <p>${auction.title} - ${auction.is_active ? 'Active' : 'Closed'}</p>
+                `;
+            });
+            historyContainer.appendChild(createdAuctions);
+
+            const participatedAuctions = document.createElement('div');
+            participatedAuctions.innerHTML = '<h3>Participated Auctions</h3>';
+            history.participated.forEach(auction => {
+                participatedAuctions.innerHTML += `
+                    <p>${auction.title} - ${auction.is_active ? 'Active' : 'Closed'}</p>
+                `;
+            });
+            historyContainer.appendChild(participatedAuctions);
+        });
+</script>
+{% endblock %}

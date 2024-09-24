@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Create New Auction</h1>
+<form method="POST" action="{{ url_for('create_auction') }}">
+    {{ form.hidden_tag() }}
+    <div>
+        {{ form.title.label }}
+        {{ form.title() }}
+    </div>
+    <div>
+        {{ form.description.label }}
+        {{ form.description() }}
+    </div>
+    <div>
+        {{ form.starting_price.label }}
+        {{ form.starting_price() }}
+    </div>
+    <div>
+        {{ form.end_time.label }}
+        {{ form.end_time() }}
+    </div>
+    {{ form.submit() }}
+</form>
+{% endblock %}

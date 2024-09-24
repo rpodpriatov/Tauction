@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Manage Auctions</h1>
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Title</th>
+            <th>Creator</th>
+            <th>Current Price</th>
+            <th>End Time</th>
+            <th>Is Active</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for auction in auctions %}
+        <tr>
+            <td>{{ auction.id }}</td>
+            <td>{{ auction.title }}</td>
+            <td>{{ auction.creator.username }}</td>
+            <td>{{ auction.current_price }}</td>
+            <td>{{ auction.end_time.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+            <td>{{ auction.is_active }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
