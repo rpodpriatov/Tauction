@@ -6,6 +6,18 @@
 <p>Current Price: {{ auction.current_price }} XTR</p>
 <p>End Time: {{ auction.end_time.strftime('%Y-%m-%d %H:%M:%S') }}</p>
 
+{% if current_user.is_authenticated %}
+    {% if auction in current_user.watchlist %}
+        <form action="{{ url_for('remove_from_watchlist', auction_id=auction.id) }}" method="post">
+            <input type="submit" value="Remove from Watchlist">
+        </form>
+    {% else %}
+        <form action="{{ url_for('add_to_watchlist', auction_id=auction.id) }}" method="post">
+            <input type="submit" value="Add to Watchlist">
+        </form>
+    {% endif %}
+{% endif %}
+
 {% if auction.is_active %}
     <form method="POST" action="{{ url_for('place_bid', auction_id=auction.id) }}">
         {{ form.hidden_tag() }}

@@ -9,6 +9,11 @@ class Base(DeclarativeBase):
 
 db = SQLAlchemy(model_class=Base)
 
+watchlist = db.Table('watchlist',
+    db.Column('user_id', db.Integer, db.ForeignKey('user.id'), primary_key=True),
+    db.Column('auction_id', db.Integer, db.ForeignKey('auction.id'), primary_key=True)
+)
+
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     telegram_id = db.Column(db.String(120), unique=True, nullable=False)
@@ -17,6 +22,8 @@ class User(UserMixin, db.Model):
     is_admin = db.Column(db.Boolean, default=False)
     auctions = db.relationship('Auction', backref='creator', lazy='dynamic')
     bids = db.relationship('Bid', backref='bidder', lazy='dynamic')
+    watchlist = db.relationship('Auction', secondary=watchlist, lazy='subquery',
+                                backref=db.backref('watchers', lazy=True))
 
 class Auction(db.Model):
     id = db.Column(db.Integer, primary_key=True)

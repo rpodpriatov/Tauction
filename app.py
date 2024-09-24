@@ -1,6 +1,6 @@
-from flask import Flask, render_template, jsonify
+from flask import Flask, render_template, jsonify, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
-from flask_login import LoginManager
+from flask_login import LoginManager, current_user, login_required
 from config import Config
 from models import db, User, Auction
 from auth import auth
@@ -36,6 +36,31 @@ def get_active_auctions():
         'current_price': auction.current_price,
         'end_time': auction.end_time.isoformat()
     } for auction in active_auctions])
+
+@app.route('/watchlist')
+@login_required
+def watchlist():
+    return render_template('watchlist.html', auctions=current_user.watchlist)
+
+@app.route('/add_to_watchlist/<int:auction_id>', methods=['POST'])
+@login_required
+def add_to_watchlist(auction_id):
+    auction = Auction.query.get_or_404(auction_id)
+    if auction not in current_user.watchlist:
+        current_user.watchlist.append(auction)
+        db.session.commit()
+        flash('Auction added to watchlist', 'success')
+    return redirect(url_for('auction_detail', auction_id=auction_id))
+
+@app.route('/remove_from_watchlist/<int:auction_id>', methods=['POST'])
+@login_required
+def remove_from_watchlist(auction_id):
+    auction = Auction.query.get_or_404(auction_id)
+    if auction in current_user.watchlist:
+        current_user.watchlist.remove(auction)
+        db.session.commit()
+        flash('Auction removed from watchlist', 'success')
+    return redirect(url_for('watchlist'))
 
 @app.errorhandler(404)
 def not_found_error(error):
