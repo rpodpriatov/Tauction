@@ -4,7 +4,9 @@
 <h1>Welcome to the Auction Platform</h1>
 <div id="active-auctions">
     <h2>Active Auctions</h2>
-    <!-- Auctions will be loaded here dynamically -->
+    <div id="auctions-container">
+        <!-- Auctions will be loaded here dynamically -->
+    </div>
 </div>
 {% endblock %}
 
@@ -14,17 +16,26 @@
     fetch('/api/active_auctions')
         .then(response => response.json())
         .then(auctions => {
-            const auctionsContainer = document.getElementById('active-auctions');
-            auctions.forEach(auction => {
-                const auctionElement = document.createElement('div');
-                auctionElement.innerHTML = `
-                    <h3>${auction.title}</h3>
-                    <p>Current Price: ${auction.current_price} XTR</p>
-                    <p>Ends at: ${new Date(auction.end_time).toLocaleString()}</p>
-                    <a href="/auction/${auction.id}">View Details</a>
-                `;
-                auctionsContainer.appendChild(auctionElement);
-            });
+            const auctionsContainer = document.getElementById('auctions-container');
+            if (auctions.length === 0) {
+                auctionsContainer.innerHTML = '<p>No active auctions available at the moment.</p>';
+            } else {
+                auctions.forEach(auction => {
+                    const auctionElement = document.createElement('div');
+                    auctionElement.innerHTML = `
+                        <h3>${auction.title}</h3>
+                        <p>Current Price: ${auction.current_price} XTR</p>
+                        <p>Ends at: ${new Date(auction.end_time).toLocaleString()}</p>
+                        <a href="/auction/${auction.id}">View Details</a>
+                    `;
+                    auctionsContainer.appendChild(auctionElement);
+                });
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching auctions:', error);
+            const auctionsContainer = document.getElementById('auctions-container');
+            auctionsContainer.innerHTML = '<p>Error loading auctions. Please try again later.</p>';
         });
 </script>
 {% endblock %}

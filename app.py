@@ -1,8 +1,8 @@
-from flask import Flask, render_template
+from flask import Flask, render_template, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from config import Config
-from models import db, User
+from models import db, User, Auction
 from auth import auth
 from admin import admin
 
@@ -23,6 +23,16 @@ def load_user(user_id):
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/api/active_auctions')
+def get_active_auctions():
+    active_auctions = Auction.query.filter_by(is_active=True).all()
+    return jsonify([{
+        'id': auction.id,
+        'title': auction.title,
+        'current_price': auction.current_price,
+        'end_time': auction.end_time.isoformat()
+    } for auction in active_auctions])
 
 @app.errorhandler(404)
 def not_found_error(error):
