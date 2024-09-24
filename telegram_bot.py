@@ -4,8 +4,8 @@ from telegram import Update, LabeledPrice
 from telegram.ext import Application, CommandHandler, CallbackContext, PreCheckoutQueryHandler, MessageHandler, filters
 from telegram.error import BadRequest
 from models import User, Auction
-from db import async_session
-from sqlalchemy.future import select
+from db import db_session
+from sqlalchemy import select
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -18,16 +18,14 @@ async def register(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     username = update.effective_user.username
 
-    async with async_session() as session:
-        result = await session.execute(select(User).filter_by(telegram_id=str(user_id)))
-        user = result.scalar_one_or_none()
-        if user:
-            await update.message.reply_text('You are already registered!')
-        else:
-            new_user = User(telegram_id=str(user_id), username=username)
-            session.add(new_user)
-            await session.commit()
-            await update.message.reply_text('Registration successful! You can now use the bot features.')
+    user = db_session.query(User).filter_by(telegram_id=str(user_id)).first()
+    if user:
+        await update.message.reply_text('You are already registered!')
+    else:
+        new_user = User(telegram_id=str(user_id), username=username)
+        db_session.add(new_user)
+        db_session.commit()
+        await update.message.reply_text('Registration successful! You can now use the bot features.')
 
 async def buy_stars(update: Update, context: CallbackContext):
     chat_id = update.effective_chat.id
@@ -58,18 +56,16 @@ async def successful_payment_callback(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     amount = update.message.successful_payment.total_amount // 100  # Convert kopecks to rubles
 
-    async with async_session() as session:
-        result = await session.execute(select(User).filter_by(telegram_id=str(user_id)))
-        user = result.scalar_one_or_none()
-        if user:
-            user.xtr_balance += amount
-            await session.commit()
-            await update.message.reply_text(f'Thank you for your payment! {amount} XTR stars have been added to your balance.')
-        else:
-            new_user = User(telegram_id=str(user_id), username=update.effective_user.username, xtr_balance=amount)
-            session.add(new_user)
-            await session.commit()
-            await update.message.reply_text(f'Thank you for your payment! A new account has been created for you with {amount} XTR stars.')
+    user = db_session.query(User).filter_by(telegram_id=str(user_id)).first()
+    if user:
+        user.xtr_balance += amount
+        db_session.commit()
+        await update.message.reply_text(f'Thank you for your payment! {amount} XTR stars have been added to your balance.')
+    else:
+        new_user = User(telegram_id=str(user_id), username=update.effective_user.username, xtr_balance=amount)
+        db_session.add(new_user)
+        db_session.commit()
+        await update.message.reply_text(f'Thank you for your payment! A new account has been created for you with {amount} XTR stars.')
 
 def setup_bot(app):
     bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
@@ -93,17 +89,15 @@ def setup_bot(app):
         raise
 
 async def send_notification(user_id, message):
-    async with async_session() as session:
-        result = await session.execute(select(User).filter_by(id=user_id))
-        user = result.scalar_one_or_none()
-        if user and user.telegram_id:
-            bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
-            if not bot_token:
-                logger.error("TELEGRAM_BOT_TOKEN is not set in the environment variables")
-                return
-            try:
-                bot = Application.builder().token(bot_token).build().bot
-                await bot.send_message(chat_id=user.telegram_id, text=message)
-                logger.info(f"Notification sent to user {user_id}")
-            except Exception as e:
-                logger.error(f"Error sending notification to user {user_id}: {str(e)}")
+    user = db_session.query(User).filter_by(id=user_id).first()
+    if user and user.telegram_id:
+        bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
+        if not bot_token:
+            logger.error("TELEGRAM_BOT_TOKEN is not set in the environment variables")
+            return
+        try:
+            bot = Application.builder().token(bot_token).build().bot
+            await bot.send_message(chat_id=user.telegram_id, text=message)
+            logger.info(f"Notification sent to user {user_id}")
+        except Exception as e:
+            logger.error(f"Error sending notification to user {user_id}: {str(e)}")

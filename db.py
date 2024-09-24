@@ -1,20 +1,14 @@
-# db.py
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, scoped_session
+from sqlalchemy.ext.declarative import declarative_base
 from config import Config
 
-# Get the database URL from the config
-DATABASE_URL = Config.SQLALCHEMY_DATABASE_URI
+engine = create_engine(Config.SQLALCHEMY_DATABASE_URI)
+db_session = scoped_session(sessionmaker(autocommit=False, autoflush=False, bind=engine))
 
-# Create the async engine
-engine = create_async_engine(DATABASE_URL, echo=True)
-
-# Create the session factory
-async_session = sessionmaker(
-    engine,
-    expire_on_commit=False,
-    class_=AsyncSession
-)
-
-# Create the base class for declarative models
 Base = declarative_base()
+Base.query = db_session.query_property()
+
+def init_db():
+    import models
+    Base.metadata.create_all(bind=engine)

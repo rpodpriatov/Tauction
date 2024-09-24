@@ -1,11 +1,10 @@
-from quart import Blueprint, request, render_template, redirect, url_for
-from quart_auth import login_user, logout_user, login_required, current_user, AuthUser
+from flask import Blueprint, request, render_template, redirect, url_for
+from flask_login import login_user, logout_user, login_required, current_user
 from models import User
-from sqlalchemy.future import select
-from db import async_session
+from sqlalchemy import select
+from db import db_session
 import hmac
 import hashlib
-import time
 from config import Config
 import logging
 
@@ -14,35 +13,32 @@ auth = Blueprint('auth', __name__)
 logger = logging.getLogger(__name__)
 
 @auth.route('/login')
-async def login():
-    return await render_template('login.html')
+def login():
+    return render_template('login.html')
 
 @auth.route('/auth/telegram', methods=['GET'])
-async def telegram_auth():
+def telegram_auth():
     auth_data = request.args.to_dict()
     if not validate_telegram_auth(auth_data):
-        return await render_template('login.html', error="Invalid Telegram authentication")
+        return render_template('login.html', error="Invalid Telegram authentication")
 
     user_id = auth_data['id']
     username = auth_data.get('username') or f"user_{user_id}"
 
-    async with async_session() as session:
-        result = await session.execute(select(User).where(User.telegram_id == user_id))
-        user = result.scalar_one_or_none()
-        if not user:
-            user = User(telegram_id=user_id, username=username)
-            session.add(user)
-            await session.commit()
-        auth_user = AuthUser(str(user.id))
-        login_user(auth_user)
+    user = db_session.query(User).filter(User.telegram_id == user_id).first()
+    if not user:
+        user = User(telegram_id=user_id, username=username)
+        db_session.add(user)
+        db_session.commit()
+    login_user(user)
 
     return redirect(url_for('index'))
 
 @auth.route('/logout')
 @login_required
-async def logout():
+def logout():
     logout_user()
-    logger.info(f"User logged out: {current_user.auth_id}")
+    logger.info(f"User logged out: {current_user.id}")
     return redirect(url_for('index'))
 
 def validate_telegram_auth(auth_data):
