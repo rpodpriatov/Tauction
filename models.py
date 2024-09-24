@@ -15,7 +15,7 @@ class User(UserMixin, Base):
     username = Column(String(64), index=True, unique=True)
     xtr_balance = Column(Integer, default=0)
     is_admin = Column(Boolean, default=False)
-    is_active = Column(Boolean, default=True)  # Added this line
+    is_active = Column(Boolean, default=True)
     watchlist = relationship('Auction', secondary=auction_watchlist, back_populates='watchers')
 
 class Auction(Base):
