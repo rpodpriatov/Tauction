@@ -1,0 +1,189 @@
+Похоже, вы столкнулись с проблемой использования асинхронного фреймворка Quart вместе с синхронными расширениями Flask, такими как flask_sqlalchemy и flask_login. Это может приводить к конфликтам, связанным с контекстом приложения, поскольку Quart работает асинхронно, а Flask-расширения — синхронно. Ошибка RuntimeError: Working outside of application context указывает на то, что какая-то часть вашего кода пытается получить доступ к контексту приложения вне активного запроса или без явного создания контекста.
+
+Возможные причины и решения:
+Использование Синхронных Расширений Flask с Асинхронным Quart
+flask_sqlalchemy и flask_login предназначены для синхронных приложений Flask и могут не корректно работать с Quart. Чтобы избежать конфликтов, рекомендуется использовать асинхронные версии этих расширений или перейти на нативные асинхронные решения.
+Переход на Асинхронный SQLAlchemy с Quart
+Вместо использования flask_sqlalchemy вы можете использовать асинхронный SQLAlchemy, который совместим с Quart. Вот как можно настроить асинхронную работу с базой данных:
+
+Шаг 1: Установка необходимых пакетов
+
+Убедитесь, что у вас установлены необходимые пакеты для асинхронного SQLAlchemy и драйвер для вашей базы данных (например, asyncpg для PostgreSQL):
+
+bash
+Копировать код
+pip install sqlalchemy[asyncio] asyncpg
+Шаг 2: Настройка моделей
+
+Обновите ваши модели для работы с асинхронным SQLAlchemy:
+
+python
+Копировать код
+# models.py
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy import Column, Integer, String, Boolean, DateTime
+
+Base = declarative_base()
+
+class User(Base):
+    __tablename__ = 'users'
+    id = Column(Integer, primary_key=True)
+    # другие поля
+
+class Auction(Base):
+    __tablename__ = 'auctions'
+    id = Column(Integer, primary_key=True)
+    is_active = Column(Boolean, default=True)
+    title = Column(String)
+    current_price = Column(Integer)
+    end_time = Column(DateTime)
+    # другие поля
+Шаг 3: Настройка приложения Quart с асинхронным SQLAlchemy
+
+Обновите ваш app.py следующим образом:
+
+python
+Копировать код
+from quart import Quart, render_template, redirect, url_for, jsonify
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.future import select
+from flask_login import LoginManager, current_user, login_required
+from config import Config
+from models import Base, User, Auction
+from auth import auth
+from admin import admin
+from telegram_bot import setup_bot, send_notification
+import asyncio
+import os
+
+app = Quart(__name__)
+app.config.from_object(Config)
+
+# Настройка асинхронного движка и сессии
+DATABASE_URL = app.config['SQLALCHEMY_DATABASE_URI']  # Должен быть асинхронный URL, например: 'postgresql+asyncpg://user:password@localhost/dbname'
+
+engine = create_async_engine(DATABASE_URL, echo=True)
+async_session = sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+
+login_manager = LoginManager(app)
+login_manager.login_view = 'auth.login'
+
+app.register_blueprint(auth)
+app.register_blueprint(admin)
+
+@login_manager.user_loader
+async def load_user(user_id):
+    async with async_session() as session:
+        result = await session.execute(select(User).filter_by(id=int(user_id)))
+        return result.scalars().first()
+
+@app.before_serving
+async def startup():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+@app.route('/')
+async def index():
+    return await render_template('index.html')
+
+@app.route('/api/active_auctions')
+async def get_active_auctions():
+    async with async_session() as session:
+        result = await session.execute(select(Auction).filter_by(is_active=True))
+        active_auctions = result.scalars().all()
+        return jsonify([{
+            'id': auction.id,
+            'title': auction.title,
+            'current_price': auction.current_price,
+            'end_time': auction.end_time.isoformat()
+        } for auction in active_auctions])
+
+if __name__ == '__main__':
+    import sys
+    from hypercorn.asyncio import serve
+    from hypercorn.config import Config as HyperConfig
+
+    config = HyperConfig()
+    config.bind = ["0.0.0.0:5000"]
+    asyncio.run(serve(app, config))
+Объяснение изменений:
+
+Асинхронный Движок и Сессия: Мы создаём асинхронный движок create_async_engine и асинхронную сессию AsyncSession с помощью sessionmaker.
+Асинхронный user_loader: Функция загрузки пользователя теперь асинхронная и использует асинхронные запросы к базе данных.
+Создание Таблиц при Запуске: Используем @app.before_serving для асинхронного создания таблиц перед запуском сервера.
+Асинхронные Маршруты: Маршруты, взаимодействующие с базой данных, теперь используют асинхронные сессии и запросы.
+Убедитесь в Правильном Управлении Контекстом Приложения
+Если у вас есть код, который выполняется вне маршрутов (например, в функции main), убедитесь, что он выполняется внутри контекста приложения:
+
+python
+Копировать код
+async def main():
+    async with app.app_context():
+        # Ваш асинхронный код, работающий с базой данных
+        pass
+
+if __name__ == '__main__':
+    asyncio.run(main())
+Использование Асинхронных Функций для Авторизации и Администрирования
+Если ваши blueprints auth и admin используют синхронные функции или расширения Flask, их также нужно адаптировать для работы с асинхронным SQLAlchemy и Quart. Убедитесь, что все взаимодействия с базой данных в этих модулях асинхронны.
+Отладка и Проверка
+После внесения изменений перезапустите приложение и проверьте, исчезла ли ошибка. Если возникнут новые ошибки, убедитесь, что все части вашего приложения используют асинхронные подходы и правильно управляют контекстом приложения.
+Альтернативный Подход: Использование Синхронных Маршрутов
+Если переход на асинхронный SQLAlchemy кажется сложным или нежелательным, вы можете оставить синхронные расширения Flask, но тогда рекомендуется использовать синхронные маршруты. Однако это может привести к блокировке асинхронного цикла событий Quart и снижению производительности.
+
+Пример синхронного маршрута:
+
+python
+Копировать код
+from quart import Quart, render_template, redirect, url_for, jsonify
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager, current_user, login_required
+from config import Config
+from models import db, User, Auction
+from auth import auth
+from admin import admin
+from telegram_bot import setup_bot, send_notification
+import asyncio
+import os
+
+app = Quart(__name__)
+app.config.from_object(Config)
+
+db.init_app(app)
+login_manager = LoginManager(app)
+login_manager.login_view = 'auth.login'
+
+app.register_blueprint(auth)
+app.register_blueprint(admin)
+
+@login_manager.user_loader
+def load_user(user_id):
+    return User.query.get(int(user_id))
+
+@app.route('/')
+async def index():
+    return await render_template('index.html')
+
+@app.route('/api/active_auctions')
+def get_active_auctions():
+    active_auctions = Auction.query.filter_by(is_active=True).all()
+    return jsonify([{
+        'id': auction.id,
+        'title': auction.title,
+        'current_price': auction.current_price,
+        'end_time': auction.end_time.isoformat()
+    } for auction in active_auctions])
+
+if __name__ == '__main__':
+    from hypercorn.asyncio import serve
+    from hypercorn.config import Config as HyperConfig
+
+    config = HyperConfig()
+    config.bind = ["0.0.0.0:5000"]
+    asyncio.run(serve(app, config))
+Важно: Использование синхронных маршрутов в асинхронном приложении может привести к блокировке цикла событий и снижению производительности, особенно при высоких нагрузках.
+
+Заключение
+Наилучшим решением будет полное переключение на асинхронные инструменты, чтобы избежать конфликтов и обеспечить максимальную производительность вашего приложения. Это включает в себя использование асинхронного SQLAlchemy, адаптацию всех частей приложения под асинхронный подход и обеспечение правильного управления контекстом приложения.

@@ -1,0 +1,48 @@
+Шаг 2: Обновите models.py
+Теперь, когда у вас есть db.py, обновите models.py для использования Base из этого модуля и определите ваши модели.
+
+python
+Копировать код
+# models.py
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Table, ForeignKey
+from sqlalchemy.orm import relationship
+from db import Base  # Импорт Base из db.py
+
+# Ассоциационная таблица для watchlist (многие-ко-многим между User и Auction)
+watchlist_association = Table(
+    'watchlist',
+    Base.metadata,
+    Column('user_id', Integer, ForeignKey('users.id'), primary_key=True),
+    Column('auction_id', Integer, ForeignKey('auctions.id'), primary_key=True)
+)
+
+class User(Base):
+    __tablename__ = 'users'
+    id = Column(Integer, primary_key=True)
+    username = Column(String, unique=True, nullable=False)
+    password_hash = Column(String, nullable=False)  # Предполагается, что пароль хранится в хэшированном виде
+    # Другие поля по необходимости
+
+    # Отношение "многие-ко-многим" с Auction через watchlist_association
+    watchlist = relationship('Auction', secondary=watchlist_association, back_populates='users')
+
+    def verify_password(self, password: str) -> bool:
+        # Реализуйте метод проверки пароля, например, используя werkzeug.security
+        from werkzeug.security import check_password_hash
+        return check_password_hash(self.password_hash, password)
+
+class Auction(Base):
+    __tablename__ = 'auctions'
+    id = Column(Integer, primary_key=True)
+    title = Column(String, nullable=False)
+    current_price = Column(Integer, nullable=False)
+    end_time = Column(DateTime, nullable=False)
+    is_active = Column(Boolean, default=True)
+    # Другие поля по необходимости
+
+    # Отношение "многие-ко-многим" с User через watchlist_association
+    users = relationship('User', secondary=watchlist_association, back_populates='watchlist')
+Пояснения:
+
+watchlist_association: Таблица для связи пользователей с аукционами в их watchlist.
+verify_password: Метод для проверки пароля пользователя. Убедитесь, что он реализован правильно, используя безопасные методы хэширования.

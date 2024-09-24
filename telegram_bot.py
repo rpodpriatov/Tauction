@@ -2,8 +2,10 @@ import os
 import logging
 from telegram import Update, LabeledPrice
 from telegram.ext import Application, CommandHandler, CallbackContext, PreCheckoutQueryHandler, MessageHandler, filters
-from models import db, User, Auction, Bid
-from flask import current_app
+from models import User, Auction
+from db import async_session  # Import async_session from db.py
+from sqlalchemy.future import select
+from quart import current_app
 
 # Set up logging
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
@@ -38,14 +40,16 @@ async def successful_payment_callback(update: Update, context: CallbackContext):
     user_id = update.effective_user.id
     amount = update.message.successful_payment.total_amount // 100  # Convert cents to dollars
 
-    with current_app.app_context():
-        user = User.query.filter_by(telegram_id=str(user_id)).first()
-        if user:
-            user.xtr_balance += amount
-            db.session.commit()
-            await update.message.reply_text(f'Thank you for your payment! {amount} XTR stars have been added to your balance.')
-        else:
-            await update.message.reply_text('Error: User not found. Please register on the website first.')
+    async with current_app.app_context():
+        async with async_session() as session:
+            result = await session.execute(select(User).filter_by(telegram_id=str(user_id)))
+            user = result.scalar_one_or_none()
+            if user:
+                user.xtr_balance += amount
+                await session.commit()
+                await update.message.reply_text(f'Thank you for your payment! {amount} XTR stars have been added to your balance.')
+            else:
+                await update.message.reply_text('Error: User not found. Please register on the website first.')
 
 def setup_bot(app):
     bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
@@ -67,17 +71,19 @@ def setup_bot(app):
         logger.error(f"Error initializing Telegram bot: {str(e)}")
         raise
 
-def send_notification(user_id, message):
-    with current_app.app_context():
-        user = User.query.get(user_id)
-        if user and user.telegram_id:
-            bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
-            if not bot_token:
-                logger.error("TELEGRAM_BOT_TOKEN is not set in the environment variables")
-                return
-            try:
-                bot = telegram.Bot(token=bot_token)
-                asyncio.run(bot.send_message(chat_id=user.telegram_id, text=message))
-                logger.info(f"Notification sent to user {user_id}")
-            except Exception as e:
-                logger.error(f"Error sending notification to user {user_id}: {str(e)}")
+async def send_notification(user_id, message):
+    async with current_app.app_context():
+        async with async_session() as session:
+            result = await session.execute(select(User).filter_by(id=user_id))
+            user = result.scalar_one_or_none()
+            if user and user.telegram_id:
+                bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
+                if not bot_token:
+                    logger.error("TELEGRAM_BOT_TOKEN is not set in the environment variables")
+                    return
+                try:
+                    bot = Application.builder().token(bot_token).build().bot
+                    await bot.send_message(chat_id=user.telegram_id, text=message)
+                    logger.info(f"Notification sent to user {user_id}")
+                except Exception as e:
+                    logger.error(f"Error sending notification to user {user_id}: {str(e)}")

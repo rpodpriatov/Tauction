@@ -1,44 +1,46 @@
-from flask_sqlalchemy import SQLAlchemy
-from werkzeug.security import generate_password_hash, check_password_hash
-from flask_login import UserMixin
-from sqlalchemy.orm import DeclarativeBase
-from datetime import datetime
+# models.py
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Table, ForeignKey
+from sqlalchemy.orm import relationship
+from db import Base  # Import Base from db.py
 
-class Base(DeclarativeBase):
-    pass
-
-db = SQLAlchemy(model_class=Base)
-
-watchlist = db.Table('watchlist',
-    db.Column('user_id', db.Integer, db.ForeignKey('user.id'), primary_key=True),
-    db.Column('auction_id', db.Integer, db.ForeignKey('auction.id'), primary_key=True)
+# Association table for watchlist (many-to-many between User and Auction)
+watchlist_association = Table(
+    'watchlist',
+    Base.metadata,
+    Column('user_id', Integer, ForeignKey('users.id'), primary_key=True),
+    Column('auction_id', Integer, ForeignKey('auctions.id'), primary_key=True)
 )
 
-class User(UserMixin, db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    telegram_id = db.Column(db.String(120), unique=True, nullable=False)
-    username = db.Column(db.String(64), index=True, unique=True)
-    xtr_balance = db.Column(db.Integer, default=0)
-    is_admin = db.Column(db.Boolean, default=False)
-    auctions = db.relationship('Auction', backref='creator', lazy='dynamic')
-    bids = db.relationship('Bid', backref='bidder', lazy='dynamic')
-    watchlist = db.relationship('Auction', secondary=watchlist, lazy='subquery',
-                                backref=db.backref('watchers', lazy=True))
+class User(Base):
+    __tablename__ = 'users'
+    id = Column(Integer, primary_key=True)
+    username = Column(String, unique=True, nullable=False)
+    telegram_id = Column(String, unique=True, nullable=True)
+    xtr_balance = Column(Integer, default=0)
 
-class Auction(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(120), nullable=False)
-    description = db.Column(db.Text)
-    starting_price = db.Column(db.Integer, nullable=False)
-    current_price = db.Column(db.Integer, nullable=False)
-    end_time = db.Column(db.DateTime, nullable=False)
-    creator_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    is_active = db.Column(db.Boolean, default=True)
-    bids = db.relationship('Bid', backref='auction', lazy='dynamic')
+    # Relationship with Auction through watchlist_association
+    watchlist = relationship('Auction', secondary=watchlist_association, back_populates='users')
+    bids = relationship('Bid', back_populates='user')
 
-class Bid(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    amount = db.Column(db.Integer, nullable=False)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    auction_id = db.Column(db.Integer, db.ForeignKey('auction.id'), nullable=False)
+class Auction(Base):
+    __tablename__ = 'auctions'
+    id = Column(Integer, primary_key=True)
+    title = Column(String, nullable=False)
+    current_price = Column(Integer, nullable=False)
+    end_time = Column(DateTime, nullable=False)
+    is_active = Column(Boolean, default=True)
+
+    # Relationship with User through watchlist_association
+    users = relationship('User', secondary=watchlist_association, back_populates='watchlist')
+    bids = relationship('Bid', back_populates='auction')
+
+class Bid(Base):
+    __tablename__ = 'bids'
+    id = Column(Integer, primary_key=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    auction_id = Column(Integer, ForeignKey('auctions.id'), nullable=False)
+    amount = Column(Integer, nullable=False)
+    timestamp = Column(DateTime, nullable=False)
+
+    user = relationship('User', back_populates='bids')
+    auction = relationship('Auction', back_populates='bids')

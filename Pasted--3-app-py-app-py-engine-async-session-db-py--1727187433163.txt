@@ -1,31 +1,47 @@
+Шаг 3: Обновите app.py
+Теперь обновим app.py, чтобы использовать engine и async_session из db.py. Также убедимся, что модели и blueprints импортируются корректно.
+
+python
+Копировать код
+# app.py
 from quart import Quart, render_template, redirect, url_for, jsonify
-from quart_auth import QuartAuth, AuthUser, login_required, current_user
-from sqlalchemy.ext.asyncio import AsyncSession
+from quart_auth import QuartAuth, AuthUser, login_user, logout_user, login_required, current_user
 from sqlalchemy.future import select
 from hypercorn.asyncio import serve
 from hypercorn.config import Config as HyperConfig
 from config import Config
-from models import User, Auction, Base
+from models import Base, User, Auction
 from auth import auth
 from admin import admin
 from telegram_bot import setup_bot, send_notification
-from db import engine, async_session  # Import from db.py
 import asyncio
 import os
+
+from db import engine, async_session  # Импорт из db.py
 
 app = Quart(__name__)
 app.config.from_object(Config)
 
+# Инициализация QuartAuth
 auth_manager = QuartAuth(app)
 
+@auth_manager.user_loader
+async def load_user(auth: AuthUser) -> User:
+    async with async_session() as session:
+        result = await session.execute(select(User).where(User.id == int(auth.auth_id)))
+        return result.scalar_one_or_none()
+
+# Регистрация Blueprints
 app.register_blueprint(auth)
 app.register_blueprint(admin)
 
+# Создание таблиц перед запуском сервера
 @app.before_serving
 async def startup():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
+# Маршруты
 @app.route('/')
 async def index():
     return await render_template('index.html')
@@ -46,41 +62,31 @@ async def get_active_auctions():
 @login_required
 async def watchlist():
     async with async_session() as session:
-        result = await session.execute(select(User).where(User.id == int(current_user.auth_id)))
-        user = result.scalar_one_or_none()
-        if user:
-            await session.refresh(user)
-            return await render_template('watchlist.html', auctions=user.watchlist)
-        return 'User not found', 404
+        user = await session.get(User, current_user.id)
+        await session.refresh(user)  # Обновляем объект пользователя
+        return await render_template('watchlist.html', auctions=user.watchlist)
 
 @app.route('/add_to_watchlist/<int:auction_id>', methods=['POST'])
 @login_required
 async def add_to_watchlist(auction_id):
     async with async_session() as session:
-        result = await session.execute(select(User).where(User.id == int(current_user.auth_id)))
-        user = result.scalar_one_or_none()
-        if user:
-            auction = await session.get(Auction, auction_id)
-            if auction and auction not in user.watchlist:
-                user.watchlist.append(auction)
-                await session.commit()
-            return redirect(url_for('auction_detail', auction_id=auction_id))
-        return 'User not found', 404
+        auction = await session.get(Auction, auction_id)
+        if auction and auction not in current_user.watchlist:
+            current_user.watchlist.append(auction)
+            await session.commit()
+    return redirect(url_for('auction_detail', auction_id=auction_id))
 
 @app.route('/remove_from_watchlist/<int:auction_id>', methods=['POST'])
 @login_required
 async def remove_from_watchlist(auction_id):
     async with async_session() as session:
-        result = await session.execute(select(User).where(User.id == int(current_user.auth_id)))
-        user = result.scalar_one_or_none()
-        if user:
-            auction = await session.get(Auction, auction_id)
-            if auction and auction in user.watchlist:
-                user.watchlist.remove(auction)
-                await session.commit()
-            return redirect(url_for('watchlist'))
-        return 'User not found', 404
+        auction = await session.get(Auction, auction_id)
+        if auction and auction in current_user.watchlist:
+            current_user.watchlist.remove(auction)
+            await session.commit()
+    return redirect(url_for('watchlist'))
 
+# Обработчики ошибок
 @app.errorhandler(404)
 async def not_found_error(error):
     return await render_template('errors/404.html'), 404
@@ -91,6 +97,7 @@ async def internal_error(error):
         await session.rollback()
     return await render_template('errors/500.html'), 500
 
+# Функции для Telegram-бота
 async def run_bot(application):
     await application.initialize()
     await application.start()
@@ -115,3 +122,8 @@ async def main():
 
 if __name__ == '__main__':
     asyncio.run(main())
+Пояснения:
+
+Импорт engine и async_session из db.py: Это обеспечивает централизованное управление базой данных.
+@auth_manager.user_loader: Асинхронная функция для загрузки пользователя по auth_id.
+Маршруты watchlist, add_to_watchlist, remove_from_watchlist: Используют асинхронные сессии для взаимодействия с базой данных.
