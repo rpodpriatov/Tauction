@@ -27,7 +27,7 @@ def telegram_auth():
 
     user = db_session.query(User).filter(User.telegram_id == user_id).first()
     if not user:
-        user = User(telegram_id=user_id, username=username)
+        user = User(telegram_id=user_id, username=username, is_active=True)
         db_session.add(user)
         db_session.commit()
     login_user(user)
