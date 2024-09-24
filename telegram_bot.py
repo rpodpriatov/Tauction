@@ -12,7 +12,7 @@ async def buy_stars(update: Update, context: CallbackContext):
     title = "XTR Stars Purchase"
     description = "Purchase XTR stars for use in auctions"
     payload = "Custom-Payload"
-    provider_token = current_app.config['PAYMENT_PROVIDER_TOKEN']
+    provider_token = os.environ.get('PAYMENT_PROVIDER_TOKEN')
     currency = "USD"
     price = 100  # Price in cents
     prices = [LabeledPrice("XTR Stars", price)]
@@ -42,7 +42,10 @@ async def successful_payment_callback(update: Update, context: CallbackContext):
             await update.message.reply_text('Error: User not found. Please register on the website first.')
 
 def setup_bot(app):
-    bot_token = app.config['TELEGRAM_BOT_TOKEN']
+    bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
+    if not bot_token:
+        raise ValueError("TELEGRAM_BOT_TOKEN is not set in the environment variables")
+    
     application = Application.builder().token(bot_token).build()
 
     application.add_handler(CommandHandler('start', start))
@@ -56,6 +59,6 @@ def send_notification(user_id, message):
     with current_app.app_context():
         user = User.query.get(user_id)
         if user and user.telegram_id:
-            bot_token = current_app.config['TELEGRAM_BOT_TOKEN']
+            bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
             bot = telegram.Bot(token=bot_token)
             asyncio.run(bot.send_message(chat_id=user.telegram_id, text=message))
