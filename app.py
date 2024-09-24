@@ -78,5 +78,6 @@ def shutdown_session(exception=None):
     db_session.remove()
 
 if __name__ == '__main__':
+    logging.basicConfig(filename='app.log', level=logging.INFO)
     bot_application = setup_bot(app)
     app.run(host='0.0.0.0', port=5000)
