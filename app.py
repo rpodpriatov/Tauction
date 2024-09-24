@@ -16,6 +16,8 @@ import os
 app = Quart(__name__)
 app.config.from_object(Config)
 
+print(f"Telegram Bot Username: {app.config['TELEGRAM_BOT_USERNAME']}")  # Added print statement
+
 auth_manager = QuartAuth(app)
 
 app.register_blueprint(auth)
