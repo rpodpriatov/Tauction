@@ -1,0 +1,92 @@
+Давайте разберёмся с каждой из этих проблем по порядку.
+
+1. Ошибка Method Not Allowed при доступе к /auth/telegram
+
+Причина:
+Ваша ошибка Method Not Allowed указывает на то, что маршрут /auth/telegram не принимает HTTP-метод GET, который используется виджетом Telegram Login для передачи данных аутентификации.
+
+Решение:
+Убедитесь, что маршрут /auth/telegram в вашем файле auth.py настроен для обработки GET-запросов.
+
+Шаги для исправления:
+Проверьте маршрут /auth/telegram в auth.py:
+Убедитесь, что маршрут определён с методом GET. Пример корректного определения маршрута:
+
+python
+Копировать код
+# auth.py
+from quart import Blueprint, render_template, redirect, url_for, request
+from quart_auth import login_user, logout_user, login_required, current_user, AuthUser
+from models import User
+from sqlalchemy.future import select
+from db import async_session
+import hashlib
+import hmac
+import os
+import logging
+
+auth = Blueprint('auth', __name__)
+logger = logging.getLogger(__name__)
+
+@auth.route('/auth/telegram', methods=['GET'])
+async def telegram_auth():
+    params = request.args
+    logger.info(f"Received Telegram auth params: {params}")
+    auth_data = {
+        'id': params.get('id'),
+        'first_name': params.get('first_name'),
+        'last_name': params.get('last_name'),
+        'username': params.get('username'),
+        'photo_url': params.get('photo_url'),
+        'auth_date': params.get('auth_date'),
+        'hash': params.get('hash')
+    }
+
+    # Валидация данных от Telegram
+    if not validate_telegram_auth(auth_data):
+        logger.warning("Invalid Telegram authentication")
+        return await render_template('auth/login.html', error="Invalid Telegram authentication")
+
+    user_id = auth_data['id']
+    username = auth_data.get('username') or f"user_{user_id}"
+
+    async with async_session() as session:
+        result = await session.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        if not user:
+            # Создайте нового пользователя, если он не существует
+            user = User(id=user_id, username=username, password_hash='')  # Пароль можно оставить пустым
+            session.add(user)
+            await session.commit()
+        await login_user(AuthUser(id=user.id))
+    
+    return redirect(url_for('index'))
+
+def validate_telegram_auth(auth_data):
+    # Получите ваш токен бота
+    bot_token = os.getenv('TELEGRAM_BOT_TOKEN')
+    if not bot_token:
+        logger.error("TELEGRAM_BOT_TOKEN not set")
+        return False
+
+    # Получите секретный ключ
+    secret_key = hashlib.sha256(bot_token.encode()).digest()
+
+    # Отсортируйте данные по ключам
+    sorted_data = sorted((k, v) for k, v in auth_data.items() if k != 'hash')
+
+    # Создайте строку для хэширования
+    data_check_string = "\n".join(f"{k}={v}" for k, v in sorted_data)
+
+    # Вычислите хэш
+    hash_digest = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+
+    # Сравните вычисленный хэш с предоставленным
+    is_valid = hmac.compare_digest(hash_digest, auth_data['hash'])
+    logger.info(f"Telegram auth validation result: {is_valid}")
+    return is_valid
+Пояснения:
+
+methods=['GET']: Маршрут настроен для обработки GET-запросов.
+Логирование: Добавлены сообщения для упрощения отладки.
+Валидация: Функция validate_telegram_auth проверяет подлинность данных от Telegram.
