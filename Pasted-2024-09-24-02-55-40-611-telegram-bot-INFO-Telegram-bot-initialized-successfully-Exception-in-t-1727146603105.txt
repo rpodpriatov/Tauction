@@ -1,0 +1,45 @@
+2024-09-24 02:55:40,611 - telegram_bot - INFO - Telegram bot initialized successfully
+Exception in thread Thread-1 (run_bot):
+Traceback (most recent call last):
+  File "/nix/store/f98g7xbckgqbkagdvpzc2r6lv3h1p9ki-python3-3.11.9/lib/python3.11/threading.py", line 1045, in _bootstrap_inner
+    self.run()
+  File "/nix/store/f98g7xbckgqbkagdvpzc2r6lv3h1p9ki-python3-3.11.9/lib/python3.11/threading.py", line 982, in run
+    self._target(*self._args, **self._kwargs)
+  File "/home/runner/TelegramLoginWidget/app.py", line 75, in run_bot
+    asyncio.run(application.run_polling())
+                ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/TelegramLoginWidget/.pythonlibs/lib/python3.11/site-packages/telegram/ext/_application.py", line 881, in run_polling
+    return self.__run(
+           ^^^^^^^^^^^
+  File "/home/runner/TelegramLoginWidget/.pythonlibs/lib/python3.11/site-packages/telegram/ext/_application.py", line 1061, in __run
+    loop = asyncio.get_event_loop()
+           ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/nix/store/f98g7xbckgqbkagdvpzc2r6lv3h1p9ki-python3-3.11.9/lib/python3.11/asyncio/events.py", line 681, in get_event_loop
+ * Serving Flask app 'app'
+ * Debug mode: off
+    raise RuntimeError('There is no current event loop in thread %r.'
+RuntimeError: There is no current event loop in thread 'Thread-1 (run_bot)'.
+/nix/store/f98g7xbckgqbkagdvpzc2r6lv3h1p9ki-python3-3.11.9/lib/python3.11/threading.py:1047: RuntimeWarning: coroutine 'Updater.start_polling' was never awaited
+  self._invoke_excepthook(self)
+RuntimeWarning: Enable tracemalloc to get the object allocation traceback
+2024-09-24 02:55:40,626 - werkzeug - INFO - WARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://172.31.196.69:5000
+2024-09-24 02:55:40,626 - werkzeug - INFO - Press CTRL+C to quit
+2024-09-24 02:55:41,166 - werkzeug - INFO - 172.31.196.69 - - [24/Sep/2024 02:55:41] "GET / HTTP/1.1" 200 -
+2024-09-24 02:55:41,179 - werkzeug - INFO - 172.31.196.69 - - [24/Sep/2024 02:55:41] "GET /static/css/style.css HTTP/1.1" 200 -
+2024-09-24 02:55:41,251 - werkzeug - INFO - 172.31.196.69 - - [24/Sep/2024 02:55:41] "GET /static/js/main.js HTTP/1.1" 200 -
+2024-09-24 02:55:41,435 - werkzeug - INFO - 172.31.196.69 - - [24/Sep/2024 02:55:41] "GET /api/active_auctions HTTP/1.1" 200 -
+2024-09-24 02:55:41,986 - werkzeug - INFO - 172.31.196.69 - - [24/Sep/2024 02:55:41] "GET / HTTP/1.1" 200 -
+2024-09-24 02:55:42,102 - werkzeug - INFO - 172.31.196.69 - - [24/Sep/2024 02:55:42] "GET /static/js/main.js HTTP/1.1" 304 -
+2024-09-24 02:55:42,109 - werkzeug - INFO - 172.31.196.69 - - [24/Sep/2024 02:55:42] "GET /static/css/style.css HTTP/1.1" 304 -
+2024-09-24 02:55:42,498 - werkzeug - INFO - 172.31.196.69 - - [24/Sep/2024 02:55:42] "GET /api/active_auctions HTTP/1.1" 200 -
+2024-09-24 02:55:53,508 - werkzeug - INFO - 172.31.196.69 - - [24/Sep/2024 02:55:53] "GET / HTTP/1.1" 200 -
+2024-09-24 02:55:53,517 - werkzeug - INFO - 172.31.196.69 - - [24/Sep/2024 02:55:53] "GET /static/css/style.css HTTP/1.1" 200 -
+2024-09-24 02:55:53,522 - werkzeug - INFO - 172.31.196.69 - - [24/Sep/2024 02:55:53] "GET /static/js/main.js HTTP/1.1" 200 -
+2024-09-24 02:55:53,579 - werkzeug - INFO - 172.31.196.69 - - [24/Sep/2024 02:55:53] "GET / HTTP/1.1" 200 -
+2024-09-24 02:55:53,690 - werkzeug - INFO - 172.31.196.69 - - [24/Sep/2024 02:55:53] "GET /static/js/main.js HTTP/1.1" 304 -
+2024-09-24 02:55:53,696 - werkzeug - INFO - 172.31.196.69 - - [24/Sep/2024 02:55:53] "GET /api/active_auctions HTTP/1.1" 200 -
+2024-09-24 02:55:53,698 - werkzeug - INFO - 172.31.196.69 - - [24/Sep/2024 02:55:53] "GET /static/css/style.css HTTP/1.1" 304 -
+2024-09-24 02:55:54,360 - werkzeug - INFO - 172.31.196.69 - - [24/Sep/2024 02:55:54] "GET /api/active_auctions HTTP/1.1" 200 

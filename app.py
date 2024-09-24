@@ -72,7 +72,9 @@ def internal_error(error):
     return render_template('errors/500.html'), 500
 
 def run_bot(application):
-    asyncio.run(application.run_polling())
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(application.run_polling())
 
 if __name__ == '__main__':
     with app.app_context():
