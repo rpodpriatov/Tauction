@@ -112,9 +112,16 @@ async def run_app():
 
 async def main():
     bot_application = setup_bot()
-    bot_task = asyncio.create_task(bot_application.run_polling())
+    bot_task = asyncio.create_task(bot_application.start())
     app_task = asyncio.create_task(run_app())
-    await asyncio.gather(bot_task, app_task)
+    
+    try:
+        await asyncio.gather(bot_task, app_task)
+    except asyncio.CancelledError:
+        pass
+    finally:
+        await bot_application.stop()
+        await bot_application.shutdown()
 
 if __name__ == '__main__':
     logging.basicConfig(filename='app.log', level=logging.INFO)

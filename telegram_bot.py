@@ -73,20 +73,15 @@ def setup_bot():
         logger.error("TELEGRAM_BOT_TOKEN is not set in the environment variables")
         raise ValueError("TELEGRAM_BOT_TOKEN is not set in the environment variables")
     
-    try:
-        application = Application.builder().token(bot_token).build()
-        logger.info("Telegram bot initialized successfully")
-
-        application.add_handler(CommandHandler('start', start))
-        application.add_handler(CommandHandler('register', register))
-        application.add_handler(CommandHandler('buy_stars', buy_stars))
-        application.add_handler(PreCheckoutQueryHandler(pre_checkout_callback))
-        application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
-
-        return application
-    except Exception as e:
-        logger.error(f"Error initializing Telegram bot: {str(e)}")
-        raise
+    application = Application.builder().token(bot_token).build()
+    
+    application.add_handler(CommandHandler('start', start))
+    application.add_handler(CommandHandler('register', register))
+    application.add_handler(CommandHandler('buy_stars', buy_stars))
+    application.add_handler(PreCheckoutQueryHandler(pre_checkout_callback))
+    application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
+    
+    return application
 
 async def send_notification(user_id, message):
     user = db_session.query(User).filter_by(id=user_id).first()
