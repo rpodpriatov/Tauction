@@ -6,7 +6,7 @@ from auth import auth
 from admin import admin
 from telegram_bot import setup_bot
 from db import db_session, init_db
-from forms import AuctionForm  # Assuming you have this form
+from forms import AuctionForm
 import logging
 
 app = Flask(__name__)
@@ -29,7 +29,11 @@ with app.app_context():
     init_db()
 
 # Setup Telegram bot
-bot_application = setup_bot(app)
+try:
+    bot_application = setup_bot(app)
+    app.logger.info("Telegram bot initialized successfully")
+except Exception as e:
+    app.logger.error(f"Failed to initialize Telegram bot: {str(e)}")
 
 @app.route('/')
 def index():
@@ -52,7 +56,7 @@ def watchlist():
 
 @app.route('/profile')
 def profile():
-    return render_template('profile.html')  # Убедитесь, что этот шаблон существует
+    return render_template('profile.html')
 
 @app.route('/add_to_watchlist/<int:auction_id>', methods=['POST'])
 @login_required
