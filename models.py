@@ -28,6 +28,9 @@ class User(UserMixin, Base):
         back_populates='watchers'
     )
 
+    # Добавляем обратную связь для созданных аукционов
+    auctions = relationship('Auction', back_populates='creator')
+
 class Auction(Base):
     __tablename__ = 'auctions'
 
@@ -44,3 +47,7 @@ class Auction(Base):
         secondary=auction_watchlist,
         back_populates='watchlist'
     )
+
+    # Добавляем связь с создателем аукциона
+    creator_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    creator = relationship('User', back_populates='auctions')
