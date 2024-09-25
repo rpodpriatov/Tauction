@@ -131,7 +131,7 @@ async def main():
     bot_application = setup_bot()
     await bot_application.initialize()
     app_task = asyncio.create_task(run_app())
-    bot_task = asyncio.create_task(bot_application.run_polling())  # Changed from start_polling to run_polling
+    bot_task = asyncio.create_task(bot_application.start_polling())
 
     try:
         await asyncio.gather(app_task, bot_task)

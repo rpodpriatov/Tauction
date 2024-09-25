@@ -4,13 +4,12 @@ import os
 import logging
 from telegram import Update, LabeledPrice
 from telegram.ext import (
-    Application, CommandHandler, CallbackQueryHandler,
-    PreCheckoutQueryHandler, MessageHandler, filters
+    Application, CommandHandler, PreCheckoutQueryHandler,
+    MessageHandler, filters
 )
 from telegram.error import BadRequest
 from models import User, Auction
 from db import db_session
-from sqlalchemy import select
 from datetime import datetime
 
 logging.basicConfig(
@@ -55,7 +54,13 @@ async def buy_stars(update: Update, context):
         prices = [LabeledPrice("XTR Stars", price)]
 
         await context.bot.send_invoice(
-            chat_id, title, description, payload, provider_token, currency, prices
+            chat_id=chat_id,
+            title=title,
+            description=description,
+            payload=payload,
+            provider_token=provider_token,
+            currency=currency,
+            prices=prices
         )
         logger.info(f"Invoice sent to user {update.effective_user.id}")
     except Exception as e:
@@ -90,7 +95,7 @@ async def successful_payment_callback(update: Update, context):
             f'Thank you for your payment! A new account has been created for you with {amount} XTR stars.'
         )
 
-def setup_bot():
+def setup_bot() -> Application:
     bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
     if not bot_token:
         logger.error("TELEGRAM_BOT_TOKEN is not set in the environment variables")
@@ -110,16 +115,13 @@ def setup_bot():
     logger.info("Bot setup completed")
     return application
 
-async def send_notification(user_id, message):
+async def send_notification(application: Application, user_id: int, message: str):
     user = db_session.query(User).filter_by(id=user_id).first()
     if user and user.telegram_id:
-        bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
-        if not bot_token:
-            logger.error("TELEGRAM_BOT_TOKEN is not set in the environment variables")
-            return
         try:
-            application = Application.builder().token(bot_token).build()
-            await application.bot.send_message(chat_id=user.telegram_id, text=message)
+            await application.bot.send_message(chat_id=int(user.telegram_id), text=message)
             logger.info(f"Notification sent to user {user_id}")
+        except BadRequest as e:
+            logger.error(f"BadRequest when sending notification to user {user_id}: {str(e)}")
         except Exception as e:
             logger.error(f"Error sending notification to user {user_id}: {str(e)}")
