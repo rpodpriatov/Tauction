@@ -37,8 +37,12 @@ def telegram_auth():
 @auth.route('/logout')
 @login_required
 def logout():
-    logout_user()
-    logger.info(f"User logged out: {current_user.id}")
+    if current_user.is_authenticated:
+        user_id = current_user.id
+        logout_user()
+        logger.info(f"User logged out: {user_id}")
+    else:
+        logger.info("Logout attempted for already logged out user")
     return redirect(url_for('index'))
 
 def validate_telegram_auth(auth_data):
