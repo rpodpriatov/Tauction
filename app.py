@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, url_for, jsonify, request, flash
+from flask import Flask, render_template, redirect, url_for, jsonify, request, flash, abort
 from flask_login import LoginManager, login_required, current_user
 from config import Config
 from models import User, Auction
@@ -91,6 +91,13 @@ def create_auction():
         flash('Your auction has been created!', 'success')
         return redirect(url_for('index'))
     return render_template('create_auction.html', title='Create Auction', form=form)
+
+@app.route('/auction/<int:auction_id>')
+def auction_detail(auction_id):
+    auction = Auction.query.get(auction_id)
+    if auction is None:
+        abort(404)
+    return render_template('auction_detail.html', auction=auction)
 
 @app.errorhandler(404)
 def not_found_error(error):
