@@ -1,3 +1,6 @@
+# app.py
+
+import os
 from flask import Flask, render_template, redirect, url_for, jsonify, request, flash, abort
 from flask_login import LoginManager, login_required, current_user
 from config import Config
@@ -38,12 +41,12 @@ def index():
 
 @app.route('/api/active_auctions')
 def get_active_auctions():
-    active_auctions = Auction.query.filter_by(is_active=True).all()
+    active_auctions = db_session.query(Auction).filter_by(is_active=True).all()
     return jsonify([{
         'id': auction.id,
         'title': auction.title,
         'current_price': auction.current_price,
-        'end_time': auction.end_time
+        'end_time': auction.end_time.isoformat()  # Use isoformat for JSON serialization
     } for auction in active_auctions])
 
 @app.route('/watchlist')
@@ -52,13 +55,14 @@ def watchlist():
     return render_template('watchlist.html', auctions=current_user.watchlist)
 
 @app.route('/profile')
+@login_required
 def profile():
     return render_template('profile.html')
 
 @app.route('/add_to_watchlist/<int:auction_id>', methods=['POST'])
 @login_required
 def add_to_watchlist(auction_id):
-    auction = Auction.query.get(auction_id)
+    auction = db_session.get(Auction, auction_id)
     if auction and auction not in current_user.watchlist:
         current_user.watchlist.append(auction)
         db_session.commit()
@@ -67,7 +71,7 @@ def add_to_watchlist(auction_id):
 @app.route('/remove_from_watchlist/<int:auction_id>', methods=['POST'])
 @login_required
 def remove_from_watchlist(auction_id):
-    auction = Auction.query.get(auction_id)
+    auction = db_session.get(Auction, auction_id)
     if auction and auction in current_user.watchlist:
         current_user.watchlist.remove(auction)
         db_session.commit()
@@ -78,13 +82,19 @@ def remove_from_watchlist(auction_id):
 def create_auction():
     form = AuctionForm()
     if form.validate_on_submit():
+        try:
+            end_time_parsed = datetime.strptime(form.end_time.data, '%Y-%m-%dT%H:%M')
+        except ValueError:
+            flash('Invalid date format. Please use the correct format.', 'error')
+            return render_template('create_auction.html', title='Create Auction', form=form)
+
         new_auction = Auction(
             title=form.title.data,
             description=form.description.data,
             current_price=form.starting_price.data,
-            end_time=datetime.strptime(form.end_time.data, '%Y-%m-%dT%H:%M'),
+            end_time=end_time_parsed,
             is_active=True,
-            creator=current_user
+            creator=current_user  # Set creator_id through the relationship
         )
         db_session.add(new_auction)
         db_session.commit()
@@ -94,7 +104,7 @@ def create_auction():
 
 @app.route('/auction/<int:auction_id>')
 def auction_detail(auction_id):
-    auction = Auction.query.get(auction_id)
+    auction = db_session.get(Auction, auction_id)
     if auction is None:
         abort(404)
     return render_template('auction_detail.html', auction=auction)
@@ -119,11 +129,12 @@ async def run_app():
 
 async def main():
     bot_application = setup_bot()
-    bot_task = asyncio.create_task(bot_application.start_polling())
+    await bot_application.initialize()
     app_task = asyncio.create_task(run_app())
-    
+    bot_task = asyncio.create_task(bot_application.run_polling())  # Changed from start_polling to run_polling
+
     try:
-        await asyncio.gather(bot_task, app_task)
+        await asyncio.gather(app_task, bot_task)
     except asyncio.CancelledError:
         pass
     finally:
