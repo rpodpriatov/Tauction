@@ -9,8 +9,9 @@ from db import db_session, init_db
 from forms import AuctionForm
 import logging
 import asyncio
-import threading
 from datetime import datetime
+from hypercorn.asyncio import serve
+from hypercorn.config import Config as HyperConfig
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -21,7 +22,7 @@ login_manager.login_view = 'auth.login'
 
 @login_manager.user_loader
 def load_user(user_id):
-    return User.query.get(int(user_id))
+    return db_session.get(User, int(user_id))
 
 # Register Blueprints
 app.register_blueprint(auth)
@@ -30,24 +31,6 @@ app.register_blueprint(admin)
 # Initialize database
 with app.app_context():
     init_db()
-
-# Setup Telegram bot
-bot_application = None
-
-def run_telegram_bot():
-    global bot_application
-    try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        bot_application = setup_bot()
-        app.logger.info("Telegram bot initialized successfully")
-        loop.run_until_complete(bot_application.run_polling())
-    except Exception as e:
-        app.logger.error(f"Failed to initialize or run Telegram bot: {str(e)}")
-
-# Start Telegram bot in a separate thread
-telegram_thread = threading.Thread(target=run_telegram_bot)
-telegram_thread.start()
 
 @app.route('/')
 def index():
@@ -122,6 +105,17 @@ def internal_error(error):
 def shutdown_session(exception=None):
     db_session.remove()
 
+async def run_app():
+    config = HyperConfig()
+    config.bind = ["0.0.0.0:5000"]
+    await serve(app, config)
+
+async def main():
+    bot_application = setup_bot()
+    bot_task = asyncio.create_task(bot_application.run_polling())
+    app_task = asyncio.create_task(run_app())
+    await asyncio.gather(bot_task, app_task)
+
 if __name__ == '__main__':
     logging.basicConfig(filename='app.log', level=logging.INFO)
-    app.run(host='0.0.0.0', port=5000)
+    asyncio.run(main())

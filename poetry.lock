@@ -388,26 +388,27 @@ zstd = ["zstandard (>=0.18.0)"]
 
 [[package]]
 name = "hypercorn"
-version = "0.17.3"
+version = "0.14.3"
 description = "A ASGI Server based on Hyper libraries and inspired by Gunicorn"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.7"
 files = [
-    {file = "hypercorn-0.17.3-py3-none-any.whl", hash = "sha256:059215dec34537f9d40a69258d323f56344805efb462959e727152b0aa504547"},
-    {file = "hypercorn-0.17.3.tar.gz", hash = "sha256:1b37802ee3ac52d2d85270700d565787ab16cf19e1462ccfa9f089ca17574165"},
+    {file = "Hypercorn-0.14.3-py3-none-any.whl", hash = "sha256:7c491d5184f28ee960dcdc14ab45d14633ca79d72ddd13cf4fcb4cb854d679ab"},
+    {file = "Hypercorn-0.14.3.tar.gz", hash = "sha256:4a87a0b7bbe9dc75fab06dbe4b301b9b90416e9866c23a377df21a969d6ab8dd"},
 ]
 
 [package.dependencies]
 h11 = "*"
 h2 = ">=3.1.0"
 priority = "*"
+toml = "*"
 wsproto = ">=0.14.0"
 
 [package.extras]
-docs = ["pydata_sphinx_theme", "sphinxcontrib_mermaid"]
+docs = ["pydata_sphinx_theme"]
 h3 = ["aioquic (>=0.9.0,<1.0)"]
-trio = ["trio (>=0.22.0)"]
-uvloop = ["uvloop (>=0.18)"]
+trio = ["trio (>=0.11.0)"]
+uvloop = ["uvloop"]
 
 [[package]]
 name = "hyperframe"
@@ -804,6 +805,17 @@ pymysql = ["pymysql"]
 sqlcipher = ["sqlcipher3_binary"]
 
 [[package]]
+name = "toml"
+version = "0.10.2"
+description = "Python Library for Tom's Obvious, Minimal Language"
+optional = false
+python-versions = ">=2.6, !=3.0.*, !=3.1.*, !=3.2.*"
+files = [
+    {file = "toml-0.10.2-py2.py3-none-any.whl", hash = "sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b"},
+    {file = "toml-0.10.2.tar.gz", hash = "sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f"},
+]
+
+[[package]]
 name = "typing-extensions"
 version = "4.12.2"
 description = "Backported and Experimental Type Hints for Python 3.8+"
@@ -865,4 +877,4 @@ email = ["email-validator"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "79391423ed3ecde744ca18df9aa9ff53c32d48feed1eac0cc9dd119f1d6b12cc"
+content-hash = "841b8e2105a2e2bdd35cbd819e7f081b587d6e7c728cdfbf342f64b3c2d51961"
