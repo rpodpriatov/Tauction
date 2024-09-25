@@ -80,14 +80,18 @@ def setup_bot():
         logger.error("TELEGRAM_BOT_TOKEN is not set in the environment variables")
         raise ValueError("TELEGRAM_BOT_TOKEN is not set in the environment variables")
     
+    logger.info(f"Setting up bot with token: {bot_token[:5]}...{bot_token[-5:]}")
+    
     application = Application.builder().token(bot_token).build()
     
+    logger.info("Adding command handlers")
     application.add_handler(CommandHandler('start', start))
     application.add_handler(CommandHandler('register', register))
     application.add_handler(CommandHandler('buy_stars', buy_stars))
     application.add_handler(PreCheckoutQueryHandler(pre_checkout_callback))
     application.add_handler(MessageHandler(filters.SUCCESSFUL_PAYMENT, successful_payment_callback))
     
+    logger.info("Bot setup completed")
     return application
 
 async def send_notification(user_id, message):
