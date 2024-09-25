@@ -29,21 +29,27 @@ async def register(update: Update, context):
         await update.message.reply_text('Registration successful! You can now use the bot features.')
 
 async def buy_stars(update: Update, context):
-    chat_id = update.effective_chat.id
-    title = "XTR Stars Purchase"
-    description = "Purchase XTR stars for use in auctions"
-    payload = "Custom-Payload"
-    provider_token = os.environ.get('PAYMENT_PROVIDER_TOKEN')
-    currency = "RUB"
-    price = 10000  # Price in kopecks (100 RUB)
-    prices = [LabeledPrice("XTR Stars", price)]
-
+    logger.info(f"buy_stars function called by user {update.effective_user.id}")
     try:
+        chat_id = update.effective_chat.id
+        title = "XTR Stars Purchase"
+        description = "Purchase XTR stars for use in auctions"
+        payload = "Custom-Payload"
+        provider_token = os.environ.get('PAYMENT_PROVIDER_TOKEN')
+        if not provider_token:
+            logger.error("PAYMENT_PROVIDER_TOKEN is not set")
+            await update.message.reply_text("Sorry, star purchases are not available at the moment.")
+            return
+        currency = "USD"  # or "RUB", depending on your payment provider
+        price = 10000  # Price in cents (100 USD)
+        prices = [LabeledPrice("XTR Stars", price)]
+
         await context.bot.send_invoice(
             chat_id, title, description, payload, provider_token, currency, prices
         )
-    except BadRequest as e:
-        logger.error(f"Error sending invoice: {e}")
+        logger.info(f"Invoice sent to user {update.effective_user.id}")
+    except Exception as e:
+        logger.error(f"Error in buy_stars function: {str(e)}")
         await update.message.reply_text("Sorry, there was an error processing your request. Please try again later.")
 
 async def pre_checkout_callback(update: Update, context):
@@ -55,7 +61,7 @@ async def pre_checkout_callback(update: Update, context):
 
 async def successful_payment_callback(update: Update, context):
     user_id = update.effective_user.id
-    amount = update.message.successful_payment.total_amount // 100  # Convert kopecks to rubles
+    amount = update.message.successful_payment.total_amount // 100  # Convert cents to dollars
 
     user = db_session.query(User).filter_by(telegram_id=str(user_id)).first()
     if user:
