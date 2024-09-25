@@ -8,6 +8,7 @@ from telegram_bot import setup_bot
 from db import db_session, init_db
 from forms import AuctionForm
 import logging
+import asyncio
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -30,7 +31,7 @@ with app.app_context():
 
 # Setup Telegram bot
 try:
-    bot_application = setup_bot(app)
+    bot_application = setup_bot()
     app.logger.info("Telegram bot initialized successfully")
 except Exception as e:
     app.logger.error(f"Failed to initialize Telegram bot: {str(e)}")
@@ -111,3 +112,7 @@ def shutdown_session(exception=None):
 if __name__ == '__main__':
     logging.basicConfig(filename='app.log', level=logging.INFO)
     app.run(host='0.0.0.0', port=5000)
+
+# Run the Telegram bot
+if bot_application:
+    asyncio.run(bot_application.run_polling())

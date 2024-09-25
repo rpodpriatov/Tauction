@@ -1,7 +1,7 @@
 import os
 import logging
 from telegram import Update, LabeledPrice
-from telegram.ext import Application, CommandHandler, CallbackContext, PreCheckoutQueryHandler, MessageHandler, filters
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, PreCheckoutQueryHandler, MessageHandler, filters
 from telegram.error import BadRequest
 from models import User, Auction
 from db import db_session
@@ -10,11 +10,11 @@ from sqlalchemy import select
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-async def start(update: Update, context: CallbackContext):
+async def start(update: Update, context):
     logger.info(f"User {update.effective_user.id} started the bot")
     await update.message.reply_text('Welcome to the Auction Platform Bot! Use /register to create an account and /buy_stars to purchase XTR stars.')
 
-async def register(update: Update, context: CallbackContext):
+async def register(update: Update, context):
     user_id = update.effective_user.id
     username = update.effective_user.username
 
@@ -27,7 +27,7 @@ async def register(update: Update, context: CallbackContext):
         db_session.commit()
         await update.message.reply_text('Registration successful! You can now use the bot features.')
 
-async def buy_stars(update: Update, context: CallbackContext):
+async def buy_stars(update: Update, context):
     chat_id = update.effective_chat.id
     title = "XTR Stars Purchase"
     description = "Purchase XTR stars for use in auctions"
@@ -45,14 +45,14 @@ async def buy_stars(update: Update, context: CallbackContext):
         logger.error(f"Error sending invoice: {e}")
         await update.message.reply_text("Sorry, there was an error processing your request. Please try again later.")
 
-async def pre_checkout_callback(update: Update, context: CallbackContext):
+async def pre_checkout_callback(update: Update, context):
     query = update.pre_checkout_query
     if query.invoice_payload != "Custom-Payload":
         await query.answer(ok=False, error_message="Something went wrong...")
     else:
         await query.answer(ok=True)
 
-async def successful_payment_callback(update: Update, context: CallbackContext):
+async def successful_payment_callback(update: Update, context):
     user_id = update.effective_user.id
     amount = update.message.successful_payment.total_amount // 100  # Convert kopecks to rubles
 
@@ -67,7 +67,7 @@ async def successful_payment_callback(update: Update, context: CallbackContext):
         db_session.commit()
         await update.message.reply_text(f'Thank you for your payment! A new account has been created for you with {amount} XTR stars.')
 
-def setup_bot(app):
+def setup_bot():
     bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
     if not bot_token:
         logger.error("TELEGRAM_BOT_TOKEN is not set in the environment variables")
@@ -96,8 +96,8 @@ async def send_notification(user_id, message):
             logger.error("TELEGRAM_BOT_TOKEN is not set in the environment variables")
             return
         try:
-            bot = Application.builder().token(bot_token).build().bot
-            await bot.send_message(chat_id=user.telegram_id, text=message)
+            application = Application.builder().token(bot_token).build()
+            await application.bot.send_message(chat_id=user.telegram_id, text=message)
             logger.info(f"Notification sent to user {user_id}")
         except Exception as e:
             logger.error(f"Error sending notification to user {user_id}: {str(e)}")
