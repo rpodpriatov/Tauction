@@ -119,7 +119,7 @@ async def run_app():
 
 async def main():
     bot_application = setup_bot()
-    bot_task = asyncio.create_task(bot_application.start())
+    bot_task = asyncio.create_task(bot_application.start_polling())
     app_task = asyncio.create_task(run_app())
     
     try:
@@ -132,4 +132,7 @@ async def main():
 
 if __name__ == '__main__':
     logging.basicConfig(filename='app.log', level=logging.INFO)
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except Exception as e:
+        logging.error(f"Error in main function: {str(e)}")
