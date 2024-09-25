@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, url_for, jsonify
+from flask import Flask, render_template, redirect, url_for, jsonify, request, flash
 from flask_login import LoginManager, login_required, current_user
 from config import Config
 from models import User, Auction
@@ -6,6 +6,7 @@ from auth import auth
 from admin import admin
 from telegram_bot import setup_bot
 from db import db_session, init_db
+from forms import AuctionForm  # Assuming you have this form
 import logging
 
 app = Flask(__name__)
@@ -49,6 +50,10 @@ def get_active_auctions():
 def watchlist():
     return render_template('watchlist.html', auctions=current_user.watchlist)
 
+@app.route('/profile')
+def profile():
+    return render_template('profile.html')  # Убедитесь, что этот шаблон существует
+
 @app.route('/add_to_watchlist/<int:auction_id>', methods=['POST'])
 @login_required
 def add_to_watchlist(auction_id):
@@ -66,6 +71,25 @@ def remove_from_watchlist(auction_id):
         current_user.watchlist.remove(auction)
         db_session.commit()
     return redirect(url_for('watchlist'))
+
+@app.route('/create_auction', methods=['GET', 'POST'])
+@login_required
+def create_auction():
+    form = AuctionForm()
+    if form.validate_on_submit():
+        new_auction = Auction(
+            title=form.title.data,
+            description=form.description.data,
+            current_price=form.starting_price.data,
+            end_time=form.end_time.data,
+            is_active=True,
+            creator=current_user
+        )
+        db_session.add(new_auction)
+        db_session.commit()
+        flash('Your auction has been created!', 'success')
+        return redirect(url_for('index'))
+    return render_template('create_auction.html', title='Create Auction', form=form)
 
 @app.errorhandler(404)
 def not_found_error(error):
