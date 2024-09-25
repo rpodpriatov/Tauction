@@ -43,7 +43,7 @@ def get_active_auctions():
         'id': auction.id,
         'title': auction.title,
         'current_price': auction.current_price,
-        'end_time': auction.end_time.isoformat()
+        'end_time': auction.end_time
     } for auction in active_auctions])
 
 @app.route('/watchlist')
