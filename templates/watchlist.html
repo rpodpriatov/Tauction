@@ -1,22 +1,25 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h1>Your Watchlist</h1>
-{% if auctions %}
-    <ul>
-    {% for auction in auctions %}
-        <li>
-            <h3>{{ auction.title }}</h3>
-            <p>Current Price: {{ auction.current_price }} XTR</p>
-            <p>Ends at: {{ auction.end_time.strftime('%Y-%m-%d %H:%M:%S') }}</p>
-            <a href="{{ url_for('auction_detail', auction_id=auction.id) }}">View Details</a>
-            <form action="{{ url_for('remove_from_watchlist', auction_id=auction.id) }}" method="post">
-                <input type="submit" value="Remove from Watchlist">
-            </form>
-        </li>
-    {% endfor %}
-    </ul>
-{% else %}
-    <p>Your watchlist is empty.</p>
-{% endif %}
+<div class="container mt-5">
+    <h1>Your Watchlist</h1>
+    {% if auctions %}
+        <ul class="list-group">
+        {% for auction in auctions %}
+            <li class="list-group-item">
+                <h2>{{ auction.title }}</h2>
+                <p>{{ auction.description }}</p>
+                <p>Current Price: {{ auction.current_price }}</p>
+                <p>Ends at: {{ auction.end_time }}</p>
+                <a href="{{ url_for('auction_detail', auction_id=auction.id) }}" class="btn btn-primary">View Details</a>
+                <form action="{{ url_for('remove_from_watchlist', auction_id=auction.id) }}" method="post" style="display: inline;">
+                    <button type="submit" class="btn btn-danger">Remove from Watchlist</button>
+                </form>
+            </li>
+        {% endfor %}
+        </ul>
+    {% else %}
+        <p>Your watchlist is empty.</p>
+    {% endif %}
+</div>
 {% endblock %}

@@ -82,7 +82,7 @@ def create_auction():
             title=form.title.data,
             description=form.description.data,
             current_price=form.starting_price.data,
-            end_time=form.end_time.data,
+            end_time=datetime.strptime(form.end_time.data, '%Y-%m-%dT%H:%M'),
             is_active=True,
             creator=current_user
         )

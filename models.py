@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Table
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Table, DateTime
 from sqlalchemy.orm import relationship
 from flask_login import UserMixin
 from db import Base  # Используем Base из db.py
@@ -38,7 +38,7 @@ class Auction(Base):
     title = Column(String(120), nullable=False)
     description = Column(String(500))
     current_price = Column(Integer, nullable=False)
-    end_time = Column(String(120), nullable=False)  # Рекомендация: Используйте DateTime
+    end_time = Column(DateTime, nullable=False)  # Changed to DateTime
     is_active = Column(Boolean, default=True, nullable=False)
 
     # Связь с пользователями через вспомогательную таблицу
