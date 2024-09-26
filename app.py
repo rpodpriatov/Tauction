@@ -1,5 +1,6 @@
 import os
 import logging
+import time
 from flask import Flask, render_template, redirect, url_for, jsonify, request, flash, abort
 from flask_login import LoginManager, login_required, current_user
 from config import Config
@@ -46,34 +47,38 @@ def index():
 
 @app.route('/api/active_auctions')
 def get_active_auctions():
-    try:
-        engine = get_db_connection()
-        with engine.connect() as connection:
-            query = db_session.query(Auction).filter_by(is_active=True)
-            logging.info(f"SQL Query: {query}")
-            active_auctions = query.all()
-            logging.info(f"Active auctions: {active_auctions}")
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            engine = get_db_connection()
+            with engine.connect() as connection:
+                query = db_session.query(Auction).filter_by(is_active=True)
+                logging.info(f"SQL Query: {query}")
+                active_auctions = query.all()
+                logging.info(f"Active auctions: {active_auctions}")
 
-            result = []
-            for auction in active_auctions:
-                logging.info(f"Processing auction: {auction}, Type: {type(auction)}")
-                if isinstance(auction, Auction):
-                    auction_data = {
-                        'id': auction.id,
-                        'title': auction.title,
-                        'current_price': auction.current_price,
-                        'end_time': auction.end_time.isoformat() if isinstance(auction.end_time, datetime) else str(auction.end_time)
-                    }
-                else:
-                    logging.warning(f"Unexpected auction type: {type(auction)}")
-                    auction_data = {'error': 'Unknown auction type'}
+                result = []
+                for auction in active_auctions:
+                    logging.info(f"Processing auction: {auction}, Type: {type(auction)}")
+                    if isinstance(auction, Auction):
+                        auction_data = {
+                            'id': auction.id,
+                            'title': auction.title,
+                            'current_price': auction.current_price,
+                            'end_time': auction.end_time.isoformat() if isinstance(auction.end_time, datetime) else str(auction.end_time)
+                        }
+                    else:
+                        logging.warning(f"Unexpected auction type: {type(auction)}")
+                        auction_data = {'error': 'Unknown auction type'}
 
-                result.append(auction_data)
+                    result.append(auction_data)
 
-            return jsonify(result)
-    except OperationalError as e:
-        logging.error(f"Database connection error: {str(e)}")
-        return jsonify({'error': 'Database connection error'}), 500
+                return jsonify(result)
+        except OperationalError as e:
+            logging.error(f"Database connection error (attempt {attempt + 1}/{max_retries}): {str(e)}")
+            if attempt == max_retries - 1:
+                return jsonify({'error': 'Database connection error'}), 500
+            time.sleep(2 ** attempt)  # Exponential backoff
 
 @app.route('/watchlist')
 @login_required
