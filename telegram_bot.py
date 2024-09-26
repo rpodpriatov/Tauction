@@ -46,22 +46,18 @@ async def buy_stars(update: Update, context):
         description = "Purchase XTR stars for use in auctions"
         payload = "Custom-Payload"
         provider_token = os.environ.get('PAYMENT_PROVIDER_TOKEN')
+        logger.info(f"PAYMENT_PROVIDER_TOKEN: {'Set' if provider_token else 'Not set'}")
         if not provider_token:
             logger.error("PAYMENT_PROVIDER_TOKEN is not set")
             await update.message.reply_text("Sorry, star purchases are not available at the moment.")
             return
-        currency = "USD"  # или "RUB", в зависимости от вашего платежного провайдера
-        price = 1000  # Цена в копейках (10 USD)
+        currency = "USD"
+        price = 1000  # Price in cents (10 USD)
         prices = [LabeledPrice("XTR Stars", price)]
 
+        logger.info(f"Sending invoice to user {update.effective_user.id}")
         await context.bot.send_invoice(
-            chat_id=chat_id,
-            title=title,
-            description=description,
-            payload=payload,
-            provider_token=provider_token,
-            currency=currency,
-            prices=prices
+            chat_id, title, description, payload, provider_token, currency, prices
         )
         logger.info(f"Invoice sent to user {update.effective_user.id}")
     except Exception as e:
