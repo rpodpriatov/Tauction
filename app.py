@@ -113,17 +113,11 @@ def remove_from_watchlist(auction_id):
 def create_auction():
     form = AuctionForm()
     if form.validate_on_submit():
-        try:
-            end_time_parsed = datetime.strptime(form.end_time.data, '%Y-%m-%dT%H:%M')
-        except ValueError:
-            flash('Invalid date format. Please use the correct format.', 'error')
-            return render_template('create_auction.html', title='Create Auction', form=form)
-
         new_auction = Auction(
             title=form.title.data,
             description=form.description.data,
             current_price=form.starting_price.data,
-            end_time=end_time_parsed,
+            end_time=form.end_time.data,  # This is already a datetime object
             is_active=True,
             creator=current_user
         )
