@@ -1,6 +1,5 @@
-# app.py
-
 import os
+import logging
 from flask import Flask, render_template, redirect, url_for, jsonify, request, flash, abort
 from flask_login import LoginManager, login_required, current_user
 from config import Config
@@ -8,18 +7,24 @@ from models import User, Auction
 from auth import auth
 from admin import admin
 from telegram_bot import setup_bot
-from db import db_session, init_db
+from db import db_session, init_db, get_db_connection
 from forms import AuctionForm
-import logging
 import asyncio
 from datetime import datetime
 from hypercorn.asyncio import serve
 from hypercorn.config import Config as HyperConfig
+from sqlalchemy.exc import OperationalError
 
 app = Flask(__name__)
 app.config.from_object(Config)
 
-# Initialize Flask-Login
+# Настройка логирования
+logging.basicConfig(
+    filename='app.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
+# Инициализация Flask-Login
 login_manager = LoginManager(app)
 login_manager.login_view = 'auth.login'
 
@@ -27,11 +32,11 @@ login_manager.login_view = 'auth.login'
 def load_user(user_id):
     return db_session.get(User, int(user_id))
 
-# Register Blueprints
+# Регистрация Blueprint'ов
 app.register_blueprint(auth)
 app.register_blueprint(admin)
 
-# Initialize database
+# Инициализация базы данных
 with app.app_context():
     init_db()
 
@@ -41,13 +46,34 @@ def index():
 
 @app.route('/api/active_auctions')
 def get_active_auctions():
-    active_auctions = db_session.query(Auction).filter_by(is_active=True).all()
-    return jsonify([{
-        'id': auction.id,
-        'title': auction.title,
-        'current_price': auction.current_price,
-        'end_time': auction.end_time.isoformat()  # Use isoformat for JSON serialization
-    } for auction in active_auctions])
+    try:
+        engine = get_db_connection()
+        with engine.connect() as connection:
+            query = db_session.query(Auction).filter_by(is_active=True)
+            logging.info(f"SQL Query: {query}")
+            active_auctions = query.all()
+            logging.info(f"Active auctions: {active_auctions}")
+
+            result = []
+            for auction in active_auctions:
+                logging.info(f"Processing auction: {auction}, Type: {type(auction)}")
+                if isinstance(auction, Auction):
+                    auction_data = {
+                        'id': auction.id,
+                        'title': auction.title,
+                        'current_price': auction.current_price,
+                        'end_time': auction.end_time.isoformat() if isinstance(auction.end_time, datetime) else str(auction.end_time)
+                    }
+                else:
+                    logging.warning(f"Unexpected auction type: {type(auction)}")
+                    auction_data = {'error': 'Unknown auction type'}
+
+                result.append(auction_data)
+
+            return jsonify(result)
+    except OperationalError as e:
+        logging.error(f"Database connection error: {str(e)}")
+        return jsonify({'error': 'Database connection error'}), 500
 
 @app.route('/watchlist')
 @login_required
@@ -94,7 +120,7 @@ def create_auction():
             current_price=form.starting_price.data,
             end_time=end_time_parsed,
             is_active=True,
-            creator=current_user  # Set creator_id through the relationship
+            creator=current_user
         )
         db_session.add(new_auction)
         db_session.commit()
@@ -124,26 +150,31 @@ def shutdown_session(exception=None):
 
 async def run_app():
     config = HyperConfig()
-    config.bind = ["0.0.0.0:5000"]
+    config.bind = [f"{os.getenv('HOST', '0.0.0.0')}:{os.getenv('PORT', '5000')}"]
+    config.use_reloader = False
     await serve(app, config)
+
+async def run_bot(application):
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling()
 
 async def main():
     bot_application = setup_bot()
-    await bot_application.initialize()
     app_task = asyncio.create_task(run_app())
-    bot_task = asyncio.create_task(bot_application.run_polling())
+    bot_task = asyncio.create_task(run_bot(bot_application))
 
     try:
         await asyncio.gather(app_task, bot_task)
     except asyncio.CancelledError:
-        pass
+        logging.info("Tasks were cancelled")
+    except Exception as e:
+        logging.error(f"Error in main function: {e}")
     finally:
-        await bot_application.stop()
-        await bot_application.shutdown()
+        if hasattr(bot_application, 'is_initialized') and bot_application.is_initialized():
+            await bot_application.stop()
+            await bot_application.shutdown()
+        logging.info("Application shutdown complete")
 
 if __name__ == '__main__':
-    logging.basicConfig(filename='app.log', level=logging.INFO)
-    try:
-        asyncio.run(main())
-    except Exception as e:
-        logging.error(f"Error in main function: {str(e)}")
+    asyncio.run(main())

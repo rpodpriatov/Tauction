@@ -1,15 +1,14 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Table, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Table, DateTime, Float
 from sqlalchemy.orm import relationship
 from flask_login import UserMixin
-from db import Base  # Используем Base из db.py
+from db import Base
 
 # Определение вспомогательной таблицы для связи многие-ко-многим
 auction_watchlist = Table(
-    'auction_watchlist',
-    Base.metadata,
+    'auction_watchlist', Base.metadata,
     Column('user_id', Integer, ForeignKey('users.id'), primary_key=True),
-    Column('auction_id', Integer, ForeignKey('auctions.id'), primary_key=True)
-)
+    Column('auction_id', Integer, ForeignKey('auctions.id'), primary_key=True))
+
 
 class User(UserMixin, Base):
     __tablename__ = 'users'
@@ -22,14 +21,16 @@ class User(UserMixin, Base):
     is_active = Column(Boolean, default=True, nullable=False)
 
     # Связь с аукционами через вспомогательную таблицу
-    watchlist = relationship(
-        'Auction',
-        secondary=auction_watchlist,
-        back_populates='watchers'
-    )
+    watchlist = relationship('Auction',
+                             secondary=auction_watchlist,
+                             back_populates='watchers')
 
     # Добавляем обратную связь для созданных аукционов
     auctions = relationship('Auction', back_populates='creator')
+
+    def __repr__(self):
+        return f"<User(id={self.id}, username='{self.username}')>"
+
 
 class Auction(Base):
     __tablename__ = 'auctions'
@@ -37,17 +38,18 @@ class Auction(Base):
     id = Column(Integer, primary_key=True)
     title = Column(String(120), nullable=False)
     description = Column(String(500))
-    current_price = Column(Integer, nullable=False)
-    end_time = Column(DateTime, nullable=False)  # Changed to DateTime
+    current_price = Column(Float, nullable=False)
+    end_time = Column(DateTime, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
 
     # Связь с пользователями через вспомогательную таблицу
-    watchers = relationship(
-        'User',
-        secondary=auction_watchlist,
-        back_populates='watchlist'
-    )
+    watchers = relationship('User',
+                            secondary=auction_watchlist,
+                            back_populates='watchlist')
 
     # Добавляем связь с создателем аукциона
     creator_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     creator = relationship('User', back_populates='auctions')
+
+    def __repr__(self):
+        return f"<Auction(id={self.id}, title='{self.title}', current_price={self.current_price}, end_time={self.end_time})>"

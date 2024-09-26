@@ -12,15 +12,18 @@ auth = Blueprint('auth', __name__)
 
 logger = logging.getLogger(__name__)
 
+
 @auth.route('/login')
 def login():
     return render_template('login.html')
+
 
 @auth.route('/auth/telegram', methods=['GET'])
 def telegram_auth():
     auth_data = request.args.to_dict()
     if not validate_telegram_auth(auth_data):
-        return render_template('login.html', error="Invalid Telegram authentication")
+        return render_template('login.html',
+                               error="Invalid Telegram authentication")
 
     user_id = auth_data['id']
     username = auth_data.get('username') or f"user_{user_id}"
@@ -34,6 +37,7 @@ def telegram_auth():
 
     return redirect(url_for('index'))
 
+
 @auth.route('/logout')
 @login_required
 def logout():
@@ -45,6 +49,7 @@ def logout():
         logger.info("Logout attempted for already logged out user")
     return redirect(url_for('index'))
 
+
 def validate_telegram_auth(auth_data):
     bot_token = Config.TELEGRAM_BOT_TOKEN
     if not bot_token:
@@ -54,5 +59,6 @@ def validate_telegram_auth(auth_data):
     secret_key = hashlib.sha256(bot_token.encode()).digest()
     sorted_data = sorted((k, v) for k, v in auth_data.items() if k != 'hash')
     data_check_string = "\n".join(f"{k}={v}" for k, v in sorted_data)
-    hash_digest = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+    hash_digest = hmac.new(secret_key, data_check_string.encode(),
+                           hashlib.sha256).hexdigest()
     return hmac.compare_digest(hash_digest, auth_data['hash'])

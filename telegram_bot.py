@@ -12,6 +12,7 @@ from models import User, Auction
 from db import db_session
 from datetime import datetime
 
+# Настройка логирования
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
