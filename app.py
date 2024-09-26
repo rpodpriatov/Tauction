@@ -61,11 +61,17 @@ def get_active_auctions():
                 for auction in active_auctions:
                     logging.info(f"Processing auction: {auction}, Type: {type(auction)}")
                     if isinstance(auction, Auction):
+                        end_time = auction.end_time
+                        if isinstance(end_time, datetime):
+                            end_time = end_time.isoformat()
+                        else:
+                            end_time = str(end_time)
+                        
                         auction_data = {
                             'id': auction.id,
                             'title': auction.title,
                             'current_price': auction.current_price,
-                            'end_time': auction.end_time.isoformat() if isinstance(auction.end_time, datetime) else str(auction.end_time)
+                            'end_time': end_time
                         }
                     else:
                         logging.warning(f"Unexpected auction type: {type(auction)}")

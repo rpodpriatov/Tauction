@@ -1,5 +1,3 @@
-# telegram_bot.py
-
 import os
 import logging
 from telegram import Update, LabeledPrice
@@ -12,7 +10,6 @@ from models import User, Auction
 from db import db_session
 from datetime import datetime
 
-# Настройка логирования
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
@@ -73,7 +70,7 @@ async def pre_checkout_callback(update: Update, context):
 
 async def successful_payment_callback(update: Update, context):
     user_id = update.effective_user.id
-    amount = update.message.successful_payment.total_amount // 100  # Конвертация копеек в доллары
+    amount = update.message.successful_payment.total_amount // 100  # Convert cents to dollars
 
     user = db_session.query(User).filter_by(telegram_id=str(user_id)).first()
     if user:
