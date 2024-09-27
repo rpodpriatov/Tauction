@@ -317,8 +317,9 @@ async def close_auctions():
 
 async def main():
     bot_application = setup_bot()
+    await bot_application.initialize()
     app_task = asyncio.create_task(run_app())
-    bot_task = asyncio.create_task(run_bot(bot_application))
+    bot_task = asyncio.create_task(bot_application.start_polling())
 
     scheduler = AsyncIOScheduler()
     scheduler.add_job(close_auctions, 'interval', minutes=1)
@@ -331,9 +332,8 @@ async def main():
     except Exception as e:
         logging.error(f"Error in main function: {e}")
     finally:
-        if hasattr(bot_application, 'is_initialized') and bot_application.is_initialized():
-            await bot_application.stop()
-            await bot_application.shutdown()
+        await bot_application.stop()
+        await bot_application.shutdown()
         scheduler.shutdown()
         logging.info("Application shutdown complete")
 
