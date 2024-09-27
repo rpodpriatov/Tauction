@@ -1,3 +1,5 @@
+# telegram_bot.py
+
 import os
 import logging
 import requests
@@ -18,6 +20,8 @@ logger = logging.getLogger(__name__)
 YOOMONEY_SHOP_ID = os.environ.get('YOOMONEY_SHOP_ID')
 YOOMONEY_SECRET_KEY = os.environ.get('YOOMONEY_SECRET_KEY')
 YOOMONEY_API_URL = 'https://api.yookassa.ru/v3/payments'
+
+application = None  # Глобальная переменная для бота
 
 
 async def start(update: Update, context):
@@ -159,6 +163,7 @@ async def successful_payment_callback(update: Update, context):
 
 
 def setup_bot() -> Application:
+    global application
     bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
     if not bot_token:
         logger.error(
@@ -186,12 +191,10 @@ def setup_bot() -> Application:
     return application
 
 
-async def send_notification(application: Application, user_id: int,
-                            message: str):
-    user = db_session.query(User).filter_by(id=user_id).first()
-    if user and user.telegram_id:
+async def send_notification(user_id: int, message: str):
+    if application:
         try:
-            await application.bot.send_message(chat_id=int(user.telegram_id),
+            await application.bot.send_message(chat_id=int(user_id),
                                                text=message)
             logger.info(f"Notification sent to user {user_id}")
         except BadRequest as e:
@@ -201,3 +204,5 @@ async def send_notification(application: Application, user_id: int,
         except Exception as e:
             logger.error(
                 f"Error sending notification to user {user_id}: {str(e)}")
+    else:
+        logger.error("Telegram application is not initialized.")
