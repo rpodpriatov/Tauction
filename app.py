@@ -1,3 +1,5 @@
+# app.py
+
 import os
 import logging
 import time
@@ -319,7 +321,7 @@ async def main():
     bot_application = setup_bot()
     await bot_application.initialize()
     app_task = asyncio.create_task(run_app())
-    bot_task = asyncio.create_task(bot_application.start_polling())
+    bot_task = asyncio.create_task(bot_application.run_polling())
 
     scheduler = AsyncIOScheduler()
     scheduler.add_job(close_auctions, 'interval', minutes=1)
@@ -332,7 +334,6 @@ async def main():
     except Exception as e:
         logging.error(f"Error in main function: {e}")
     finally:
-        await bot_application.stop()
         await bot_application.shutdown()
         scheduler.shutdown()
         logging.info("Application shutdown complete")
@@ -342,11 +343,6 @@ async def run_app():
     config.bind = [f"{os.getenv('HOST', '0.0.0.0')}:{os.getenv('PORT', '5000')}"]
     config.use_reloader = False
     await serve(app, config)
-
-async def run_bot(application):
-    await application.initialize()
-    await application.start()
-    await application.updater.start_polling()
 
 if __name__ == '__main__':
     asyncio.run(main())
