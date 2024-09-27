@@ -295,16 +295,16 @@ async def close_auctions():
                 winning_bid = max(auction.bids, key=lambda bid: bid.amount)
                 winner = winning_bid.bidder
                 await send_notification(
-                    winner.id,
+                    winner.telegram_id,
                     f"Поздравляем! Вы выиграли аукцион '{auction.title}' с суммой ставки {winning_bid.amount} XTR."
                 )
                 await send_notification(
-                    auction.creator.id,
+                    auction.creator.telegram_id,
                     f"Аукцион '{auction.title}' завершён. Победитель: {winner.username} с суммой ставки {winning_bid.amount} XTR."
                 )
             else:
                 await send_notification(
-                    auction.creator.id,
+                    auction.creator.telegram_id,
                     f"Аукцион '{auction.title}' завершился без победителей."
                 )
 
