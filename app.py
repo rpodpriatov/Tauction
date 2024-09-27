@@ -319,16 +319,23 @@ async def close_auctions():
 
 async def main():
     bot_application = setup_bot()
-    await bot_application.initialize()
-    app_task = asyncio.create_task(run_app())
-    bot_task = asyncio.create_task(bot_application.run_polling())
-
     scheduler = AsyncIOScheduler()
     scheduler.add_job(close_auctions, 'interval', minutes=1)
-    scheduler.start()
+    
+    async def start_bot():
+        await bot_application.initialize()
+        await bot_application.start()
+        await bot_application.updater.start_polling()
+
+    async def start_app():
+        config = HyperConfig()
+        config.bind = [f"{os.getenv('HOST', '0.0.0.0')}:{os.getenv('PORT', '5000')}"]
+        config.use_reloader = False
+        await serve(app, config)
 
     try:
-        await asyncio.gather(app_task, bot_task)
+        scheduler.start()
+        await asyncio.gather(start_bot(), start_app())
     except asyncio.CancelledError:
         logging.info("Tasks were cancelled")
     except Exception as e:
@@ -337,12 +344,6 @@ async def main():
         await bot_application.shutdown()
         scheduler.shutdown()
         logging.info("Application shutdown complete")
-
-async def run_app():
-    config = HyperConfig()
-    config.bind = [f"{os.getenv('HOST', '0.0.0.0')}:{os.getenv('PORT', '5000')}"]
-    config.use_reloader = False
-    await serve(app, config)
 
 if __name__ == '__main__':
     asyncio.run(main())
