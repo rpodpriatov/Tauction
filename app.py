@@ -1,5 +1,3 @@
-# app.py
-
 import os
 import logging
 import time
@@ -13,7 +11,7 @@ from telegram_bot import setup_bot, send_notification
 from db import db_session, init_db, get_db_connection
 from forms import AuctionForm, BidForm
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 from hypercorn.asyncio import serve
 from hypercorn.config import Config as HyperConfig
 from sqlalchemy.exc import OperationalError
@@ -25,36 +23,28 @@ import hashlib
 app = Flask(__name__)
 app.config.from_object(Config)
 
-# Настройка логирования
 logging.basicConfig(
     filename='app.log',
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Инициализация Flask-Login
 login_manager = LoginManager(app)
 login_manager.login_view = 'auth.login'
-
 
 @login_manager.user_loader
 def load_user(user_id):
     return db_session.get(User, int(user_id))
 
-
-# Регистрация Blueprint'ов
 app.register_blueprint(auth)
 app.register_blueprint(admin)
 
-# Инициализация базы данных
 with app.app_context():
     init_db()
-
 
 @app.route('/')
 def index():
     return render_template('index.html')
-
 
 @app.route('/api/active_auctions', methods=['GET'])
 def get_active_auctions():
@@ -63,11 +53,9 @@ def get_active_auctions():
         try:
             engine = get_db_connection()
             with engine.connect() as connection:
-                # Create a new session for this request
                 Session = sessionmaker(bind=engine)
                 session = Session()
 
-                # Use the session to query the database
                 query = session.query(Auction).filter_by(is_active=True)
                 logging.info(f"SQL Query: {query}")
                 active_auctions = query.all()
@@ -84,7 +72,6 @@ def get_active_auctions():
                         if isinstance(end_time, datetime):
                             end_time = end_time.isoformat()
                         elif isinstance(end_time, str):
-                            # If already a string, we just log and move on
                             logging.info(
                                 f"end_time is already a string: {end_time}")
                         elif end_time is not None:
@@ -111,7 +98,6 @@ def get_active_auctions():
 
                     result.append(auction_data)
 
-                # Close the session
                 session.close()
 
                 return jsonify(result)
@@ -121,20 +107,17 @@ def get_active_auctions():
             )
             if attempt == max_retries - 1:
                 return jsonify({'error': 'Database connection error'}), 500
-            time.sleep(2**attempt)  # Exponential backoff
-
+            time.sleep(2**attempt)
 
 @app.route('/watchlist')
 @login_required
 def watchlist():
     return render_template('watchlist.html', auctions=current_user.watchlist)
 
-
 @app.route('/profile')
 @login_required
 def profile():
     return render_template('profile.html')
-
 
 @app.route('/add_to_watchlist/<int:auction_id>', methods=['POST'])
 @login_required
@@ -148,7 +131,6 @@ def add_to_watchlist(auction_id):
         flash('Аукцион уже в избранном или не существует.', 'warning')
     return redirect(url_for('auction_detail', auction_id=auction_id))
 
-
 @app.route('/remove_from_watchlist/<int:auction_id>', methods=['POST'])
 @login_required
 def remove_from_watchlist(auction_id):
@@ -161,7 +143,6 @@ def remove_from_watchlist(auction_id):
         flash('Аукцион не найден в вашем избранном.', 'warning')
     return redirect(url_for('watchlist'))
 
-
 @app.route('/create_auction', methods=['GET', 'POST'])
 @login_required
 def create_auction():
@@ -171,7 +152,7 @@ def create_auction():
             title=form.title.data,
             description=form.description.data,
             current_price=form.starting_price.data,
-            end_time=form.end_time.data,  # Это уже объект datetime
+            end_time=form.end_time.data,
             is_active=True,
             creator=current_user)
         db_session.add(new_auction)
@@ -181,7 +162,6 @@ def create_auction():
     return render_template('create_auction.html',
                            title='Создать Аукцион',
                            form=form)
-
 
 @app.route('/auction/<int:auction_id>', methods=['GET', 'POST'])
 def auction_detail(auction_id):
@@ -195,24 +175,20 @@ def auction_detail(auction_id):
         bid_amount = bid_form.amount.data
         user = current_user
 
-        # Проверка, что пользователь аутентифицирован
         if not user.is_authenticated:
             flash('Пожалуйста, войдите в систему, чтобы сделать ставку.',
                   'warning')
             return redirect(url_for('auth.login'))
 
-        # Проверка, что ставка выше текущей цены
         if bid_amount <= auction.current_price:
             flash('Ваша ставка должна быть выше текущей цены.', 'danger')
         elif user.xtr_balance < bid_amount:
             flash('У вас недостаточно XTR для этой ставки.', 'danger')
         else:
             try:
-                # Создание новой ставки
                 new_bid = Bid(amount=bid_amount, bidder=user, auction=auction)
                 db_session.add(new_bid)
 
-                # Обновление текущей цены аукциона
                 auction.current_price = bid_amount
                 db_session.commit()
 
@@ -230,7 +206,6 @@ def auction_detail(auction_id):
                     'Произошла ошибка при размещении ставки. Пожалуйста, попробуйте позже.',
                     'danger')
 
-    # Получение всех ставок для аукциона, отсортированных по убыванию суммы
     bids = db_session.query(Bid).filter_by(auction_id=auction_id).order_by(
         Bid.amount.desc()).all()
 
@@ -239,28 +214,22 @@ def auction_detail(auction_id):
                            bids=bids,
                            bid_form=bid_form)
 
-
 @app.errorhandler(404)
 def not_found_error(error):
     return render_template('errors/404.html'), 404
-
 
 @app.errorhandler(500)
 def internal_error(error):
     db_session.rollback()
     return render_template('errors/500.html'), 500
 
-
 @app.teardown_appcontext
 def shutdown_session(exception=None):
     db_session.remove()
 
-
-# Обработка YooMoney IPN
 @app.route('/yoomoney_ipn', methods=['POST'])
 def yoomoney_ipn():
     try:
-        # Получение данных из запроса
         data = request.form.to_dict()
         signature = data.pop('sha1_hash', None)
 
@@ -268,11 +237,9 @@ def yoomoney_ipn():
             logger.error("No signature found in the IPN data")
             return jsonify({'error': 'No signature'}), 400
 
-        # Формирование строки для проверки подписи
         sorted_data = sorted(data.items())
         sorted_data_str = '&'.join(f"{k}={v}" for k, v in sorted_data)
 
-        # Вычисление хеша
         calculated_hash = hmac.new(
             os.getenv('YOOMONEY_SECRET_KEY').encode(),
             sorted_data_str.encode(), hashlib.sha1).hexdigest()
@@ -281,13 +248,11 @@ def yoomoney_ipn():
             logger.error("Invalid signature for YooMoney IPN")
             return jsonify({'error': 'Invalid signature'}), 400
 
-        # Проверка статуса платежа
         if data.get('status') != 'success':
             logger.info(
                 f"Received non-success payment status: {data.get('status')}")
             return jsonify({'status': 'ignored'}), 200
 
-        # Получение метаданных
         user_id = data.get('metadata[user_id]')
         amount = data.get('metadata[amount]')
 
@@ -300,7 +265,6 @@ def yoomoney_ipn():
             logger.error(f"User with id {user_id} not found")
             return jsonify({'error': 'User not found'}), 400
 
-        # Обновление баланса пользователя
         user.xtr_balance += int(amount)
         db_session.commit()
 
@@ -314,46 +278,48 @@ def yoomoney_ipn():
         logger.error(f"Error processing YooMoney IPN: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
-
-# Асинхронная функция для завершения аукционов
 async def close_auctions():
     current_time = datetime.utcnow()
-    ended_auctions = db_session.query(Auction).filter(
-        Auction.end_time <= current_time, Auction.is_active == True).all()
+    logger.info(f"Running close_auctions at {current_time}")
+    try:
+        ended_auctions = db_session.query(Auction).filter(
+            Auction.end_time <= current_time, 
+            Auction.is_active == True
+        ).all()
 
-    for auction in ended_auctions:
-        auction.is_active = False
+        for auction in ended_auctions:
+            auction.is_active = False
+            logger.info(f"Closing auction {auction.id}: {auction.title}")
 
-        if auction.bids:
-            winning_bid = auction.bids[0]  # Самая высокая ставка
-            winner = winning_bid.bidder
-            # Отправка уведомления победителю
-            await send_notification(
-                winner.id,
-                f"Поздравляем! Вы выиграли аукцион '{auction.title}' с суммой ставки {winning_bid.amount} XTR."
-            )
-            # Отправка уведомления создателю аукциона
-            await send_notification(
-                auction.creator.id,
-                f"Аукцион '{auction.title}' завершён. Победитель: {winner.username} с суммой ставки {winning_bid.amount} XTR."
-            )
-        else:
-            # Отправка уведомления создателю о завершении аукциона без победителей
-            await send_notification(
-                auction.creator.id,
-                f"Аукцион '{auction.title}' завершился без победителей.")
+            if auction.bids:
+                winning_bid = max(auction.bids, key=lambda bid: bid.amount)
+                winner = winning_bid.bidder
+                await send_notification(
+                    winner.id,
+                    f"Поздравляем! Вы выиграли аукцион '{auction.title}' с суммой ставки {winning_bid.amount} XTR."
+                )
+                await send_notification(
+                    auction.creator.id,
+                    f"Аукцион '{auction.title}' завершён. Победитель: {winner.username} с суммой ставки {winning_bid.amount} XTR."
+                )
+            else:
+                await send_notification(
+                    auction.creator.id,
+                    f"Аукцион '{auction.title}' завершился без победителей."
+                )
 
-        db_session.commit()
-        logging.info(f"Auction {auction.id} closed.")
+            db_session.commit()
+            logger.info(f"Auction {auction.id} closed successfully.")
 
+    except Exception as e:
+        logger.error(f"Error in close_auctions: {str(e)}")
+        db_session.rollback()
 
-# Асинхронная функция main с инициализацией AsyncIOScheduler
 async def main():
     bot_application = setup_bot()
     app_task = asyncio.create_task(run_app())
     bot_task = asyncio.create_task(run_bot(bot_application))
 
-    # Инициализация асинхронного планировщика
     scheduler = AsyncIOScheduler()
     scheduler.add_job(close_auctions, 'interval', minutes=1)
     scheduler.start()
@@ -365,28 +331,22 @@ async def main():
     except Exception as e:
         logging.error(f"Error in main function: {e}")
     finally:
-        if hasattr(bot_application,
-                   'is_initialized') and bot_application.is_initialized():
+        if hasattr(bot_application, 'is_initialized') and bot_application.is_initialized():
             await bot_application.stop()
             await bot_application.shutdown()
-        scheduler.shutdown()  # Остановка планировщика при завершении
+        scheduler.shutdown()
         logging.info("Application shutdown complete")
-
 
 async def run_app():
     config = HyperConfig()
-    config.bind = [
-        f"{os.getenv('HOST', '0.0.0.0')}:{os.getenv('PORT', '5000')}"
-    ]
+    config.bind = [f"{os.getenv('HOST', '0.0.0.0')}:{os.getenv('PORT', '5000')}"]
     config.use_reloader = False
     await serve(app, config)
-
 
 async def run_bot(application):
     await application.initialize()
     await application.start()
     await application.updater.start_polling()
-
 
 if __name__ == '__main__':
     asyncio.run(main())
