@@ -21,6 +21,7 @@ asyncpg = "^0.29.0"
 quart-auth = "^0.10.1"
 telegram = "^0.0.1"
 wtforms = "^3.1.2"
+requests = "^2.32.3"
 
 
 [build-system]

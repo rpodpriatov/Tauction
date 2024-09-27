@@ -1,10 +1,9 @@
-from app import app
-from models import User, Auction
-from db import db_session, engine, Base
+from models import User, Subscriber  # Import your models
+from db import engine, Base  # Import your database engine and Base
 
 def update_schema():
-    with app.app_context():
-        Base.metadata.create_all(bind=engine)
+    # Reflect database schema changes to the Base metadata
+    Base.metadata.create_all(bind=engine)
     print("Database schema updated successfully.")
 
 if __name__ == "__main__":

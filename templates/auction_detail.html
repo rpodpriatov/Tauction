@@ -4,18 +4,59 @@
 <div class="container mt-5">
     <h1>{{ auction.title }}</h1>
     <p>{{ auction.description }}</p>
-    <p>Current Price: {{ auction.current_price }}</p>
-    <p>End Time: {{ auction.end_time }}</p>
+    <p><strong>Текущая цена:</strong> {{ auction.current_price }} XTR</p>
+    <p><strong>Время окончания:</strong> {{ auction.end_time.strftime('%Y-%m-%d %H:%M') }}</p>
+    <p><strong>Создатель:</strong> {{ auction.creator.username }}</p>
+
     {% if current_user.is_authenticated %}
         {% if auction in current_user.watchlist %}
             <form action="{{ url_for('remove_from_watchlist', auction_id=auction.id) }}" method="post">
-                <button type="submit" class="btn btn-danger">Remove from Watchlist</button>
+                <button type="submit" class="btn btn-danger">Удалить из избранного</button>
             </form>
         {% else %}
             <form action="{{ url_for('add_to_watchlist', auction_id=auction.id) }}" method="post">
-                <button type="submit" class="btn btn-primary">Add to Watchlist</button>
+                <button type="submit" class="btn btn-primary">Добавить в избранное</button>
             </form>
         {% endif %}
+    {% endif %}
+
+    <hr>
+
+    <h3>Сделать ставку</h3>
+    {% if current_user.is_authenticated %}
+        <form method="POST" action="{{ url_for('auction_detail', auction_id=auction.id) }}">
+            {{ bid_form.hidden_tag() }}
+            <div class="mb-3">
+                {{ bid_form.amount.label(class="form-label") }}
+                {{ bid_form.amount(class="form-control", placeholder="Введите сумму ставки") }}
+                {% for error in bid_form.amount.errors %}
+                    <span class="text-danger">{{ error }}</span>
+                {% endfor %}
+            </div>
+            <div class="mb-3">
+                {{ bid_form.submit(class="btn btn-success") }}
+            </div>
+        </form>
+    {% else %}
+        <p>Пожалуйста, <a href="{{ url_for('auth.login') }}">войдите</a>, чтобы сделать ставку.</p>
+    {% endif %}
+
+    <hr>
+
+    <h3>Последние ставки</h3>
+    {% if bids %}
+        <ul class="list-group">
+            {% for bid in bids %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <strong>{{ bid.bidder.username }}</strong> сделал ставку
+                        <strong>{{ bid.amount }} XTR</strong> в {{ bid.timestamp.strftime('%Y-%m-%d %H:%M') }}
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>Ставок пока нет.</p>
     {% endif %}
 </div>
 {% endblock %}
