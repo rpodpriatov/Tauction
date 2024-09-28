@@ -66,12 +66,13 @@ async def buy_stars_yoomoney(update: Update, context):
         # Check if all required environment variables are set
         if not all([YOOMONEY_SHOP_ID, YOOMONEY_SECRET_KEY]):
             logger.error("YooMoney configuration is incomplete")
-            await update.message.reply_text("Sorry, YooMoney payments are not available at the moment.")
+            await update.message.reply_text("Sorry, YooMoney payments are not available at the moment. Please try again later or contact support.")
             return
 
         user_id = update.effective_user.id
         user = db_session.query(User).filter_by(telegram_id=str(user_id)).first()
         if not user:
+            logger.info(f"Creating new user for Telegram ID: {user_id}")
             user = User(telegram_id=str(user_id),
                         username=update.effective_user.username,
                         xtr_balance=0)
@@ -85,10 +86,12 @@ async def buy_stars_yoomoney(update: Update, context):
         try:
             amount = int(amount)
             if amount < min_amount:
-                await update.message.reply_text(f"Minimum purchase amount is {min_amount} XTR.")
+                logger.warning(f"User {user_id} attempted to purchase less than the minimum amount")
+                await update.message.reply_text(f"Minimum purchase amount is {min_amount} XTR. Please try again with a larger amount.")
                 return
         except ValueError:
-            await update.message.reply_text("Please provide a valid number of XTR to purchase.")
+            logger.warning(f"User {user_id} provided an invalid amount: {amount}")
+            await update.message.reply_text("Please provide a valid number of XTR to purchase. For example: /buy_stars_yoomoney 15")
             return
 
         total_amount = amount * 10  # 1 XTR = 10 RUB
@@ -111,17 +114,27 @@ async def buy_stars_yoomoney(update: Update, context):
         }
 
         auth = (YOOMONEY_SHOP_ID, YOOMONEY_SECRET_KEY)
-        headers = {"Content-Type": "application/json", "Idempotence-Key": str(datetime.now().timestamp())}
+        headers = {
+            "Content-Type": "application/json",
+            "Idempotence-Key": str(datetime.now().timestamp())
+        }
 
         logger.info(f"Sending payment request to YooMoney for user {user.id}")
-        response = requests.post(YOOMONEY_API_URL,
-                                 json=payment,
-                                 headers=headers,
-                                 auth=auth)
-        
-        if response.status_code == 200:
-            payment_info = response.json()
-            confirmation_url = payment_info['confirmation']['confirmation_url']
+        try:
+            response = requests.post(YOOMONEY_API_URL,
+                                     json=payment,
+                                     headers=headers,
+                                     auth=auth,
+                                     timeout=10)  # Add a timeout to the request
+            response.raise_for_status()  # Raise an exception for non-200 status codes
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error in YooMoney API request: {str(e)}")
+            await update.message.reply_text("There was an error processing your payment request. Please try again later or contact support.")
+            return
+
+        payment_info = response.json()
+        confirmation_url = payment_info.get('confirmation', {}).get('confirmation_url')
+        if confirmation_url:
             logger.info(f"YooMoney payment created for user {user.id}: {confirmation_url}")
             await update.message.reply_text(
                 f"Please complete your payment of {amount} XTR ({total_amount} RUB) by clicking the link below:\n{confirmation_url}"
@@ -129,12 +142,12 @@ async def buy_stars_yoomoney(update: Update, context):
         else:
             logger.error(f"Failed to create YooMoney payment: {response.text}")
             await update.message.reply_text(
-                "Sorry, there was an error processing your payment. Please try again later."
+                "Sorry, there was an error processing your payment. Please try again later or contact support."
             )
     except Exception as e:
-        logger.error(f"Error in buy_stars_yoomoney function: {str(e)}")
+        logger.error(f"Unexpected error in buy_stars_yoomoney function: {str(e)}")
         await update.message.reply_text(
-            "Sorry, there was an error processing your request. Please try again later."
+            "An unexpected error occurred. Please try again later or contact support."
         )
 
 async def pre_checkout_callback(update: Update, context):
