@@ -291,9 +291,14 @@ async def close_auctions():
             Auction.is_active == True
         ).all()
 
+        logger.info(f"Found {len(ended_auctions)} auctions to close")
+
+        if not ended_auctions:
+            logger.info("No auctions to close at this time")
+            return
+
         for auction in ended_auctions:
             auction.is_active = False
-            logger.info(f"Auction {auction.id} marked as inactive")
             logger.info(f"Closing auction {auction.id}: {auction.title}")
 
             if auction.bids:
@@ -314,7 +319,9 @@ async def close_auctions():
                 )
 
             db_session.commit()
-            logger.info(f"Auction {auction.id} closed successfully.")
+            logger.info(f"Auction {auction.id} closed successfully")
+
+        logger.info(f"Closed {len(ended_auctions)} auctions")
 
     except Exception as e:
         logger.error(f"Error in close_auctions: {str(e)}")
@@ -324,6 +331,7 @@ async def main():
     bot_application = setup_bot()
     scheduler = AsyncIOScheduler()
     scheduler.add_job(close_auctions, 'interval', minutes=1)
+    scheduler.start()
     
     async def start_bot():
         await bot_application.initialize()
@@ -337,7 +345,6 @@ async def main():
         await serve(app, config)
 
     try:
-        scheduler.start()
         await asyncio.gather(start_bot(), start_app())
     except asyncio.CancelledError:
         logging.info("Tasks were cancelled")
