@@ -15,14 +15,26 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # YooMoney API Configuration
-YOOMONEY_SHOP_ID = '463032'
-YOOMONEY_SECRET_KEY = 'test_DgU87ik2uVLeLbSPSgO9mDb0La5tcUxqwlXVcQvg-YU'
+YOOMONEY_SHOP_ID = os.environ.get('YOOMONEY_SHOP_ID')
+YOOMONEY_SECRET_KEY = os.environ.get('YOOMONEY_SECRET_KEY')
 YOOMONEY_SHOP_ARTICLE_ID = os.environ.get('YOOMONEY_SHOP_ARTICLE_ID')
 
 Configuration.account_id = YOOMONEY_SHOP_ID
 Configuration.secret_key = YOOMONEY_SECRET_KEY
 
 application = None  # Global variable for the bot
+
+def validate_yoomoney_config():
+    if not all([YOOMONEY_SHOP_ID, YOOMONEY_SECRET_KEY, YOOMONEY_SHOP_ARTICLE_ID]):
+        missing_vars = [var for var in ['YOOMONEY_SHOP_ID', 'YOOMONEY_SECRET_KEY', 'YOOMONEY_SHOP_ARTICLE_ID'] if not globals().get(var)]
+        logger.error(f"YooMoney configuration is incomplete. Missing variables: {', '.join(missing_vars)}")
+        return False
+    
+    if Configuration.account_id != YOOMONEY_SHOP_ID or Configuration.secret_key != YOOMONEY_SECRET_KEY:
+        logger.error("YooMoney Configuration does not match environment variables")
+        return False
+    
+    return True
 
 async def start(update: Update, context):
     logger.info(f"User {update.effective_user.id} started the bot")
@@ -33,11 +45,8 @@ async def start(update: Update, context):
 async def buy_stars_yoomoney(update: Update, context):
     logger.info(f"buy_stars_yoomoney function called by user {update.effective_user.id}")
     try:
-        # Step 1: Check if all required environment variables are set
-        logger.info("Checking YooMoney configuration")
-        if not all([YOOMONEY_SHOP_ID, YOOMONEY_SECRET_KEY, YOOMONEY_SHOP_ARTICLE_ID]):
-            missing_vars = [var for var in ['YOOMONEY_SHOP_ID', 'YOOMONEY_SECRET_KEY', 'YOOMONEY_SHOP_ARTICLE_ID'] if not globals().get(var)]
-            logger.error(f"YooMoney configuration is incomplete. Missing variables: {', '.join(missing_vars)}")
+        # Step 1: Validate YooMoney configuration
+        if not validate_yoomoney_config():
             await update.message.reply_text("Sorry, YooMoney payments are not available at the moment. Please try again later or contact support.")
             return
 
@@ -94,7 +103,7 @@ async def buy_stars_yoomoney(update: Update, context):
                 "customer": {
                     "full_name": update.effective_user.full_name,
                     "phone": "",
-                    "email": ""
+                    "email": "user@example.com"  # Add a valid email address here
                 },
                 "items": [
                     {
@@ -111,6 +120,9 @@ async def buy_stars_yoomoney(update: Update, context):
                 ]
             }
         }
+
+        if YOOMONEY_SHOP_ARTICLE_ID:
+            payment_data["merchant_article_id"] = YOOMONEY_SHOP_ARTICLE_ID
 
         logger.info(f"Payment data prepared: {payment_data}")
 
@@ -214,15 +226,33 @@ def test_yoomoney_connection():
             },
             "confirmation": {
                 "type": "redirect",
-                "return_url": "https://www.example.com/return_url"
+                "return_url": "https://28a049bf-d335-42ae-85a0-10cc9620e09d-00-1ri3afroqi0sf.spock.replit.dev"
             },
             "capture": False,
-            "description": "Test payment"
+            "description": "Test payment",
+            "receipt": {
+                "customer": {
+                    "email": "test@example.com"
+                },
+                "items": [
+                    {
+                        "description": "Test item",
+                        "quantity": "1",
+                        "amount": {
+                            "value": "1.00",
+                            "currency": "RUB"
+                        },
+                        "vat_code": "1"
+                    }
+                ]
+            }
         })
         logger.info(f"Test payment created successfully: {test_payment.id}")
+        logger.info(f"Test payment details: {test_payment.json()}")
         return True
     except Exception as e:
         logger.error(f"Error in test_yoomoney_connection: {str(e)}")
+        logger.exception("Detailed traceback:")
         return False
 
 # Run the test connection function
