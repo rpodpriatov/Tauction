@@ -176,39 +176,40 @@ def auction_detail(auction_id):
     bid_form = BidForm()
 
     if bid_form.validate_on_submit():
-        bid_amount = bid_form.amount.data
-        user = current_user
-
-        if not user.is_authenticated:
-            flash('Пожалуйста, войдите в систему, чтобы сделать ставку.',
-                  'warning')
-            return redirect(url_for('auth.login'))
-
-        if bid_amount <= auction.current_price:
-            flash('Ваша ставка должна быть выше текущей цены.', 'danger')
-        elif user.xtr_balance < bid_amount:
-            flash('У вас недостаточно XTR для этой ставки.', 'danger')
+        if not auction.is_active:
+            flash('This auction has ended. Bidding is no longer allowed.', 'warning')
         else:
-            try:
-                new_bid = Bid(amount=bid_amount, bidder=user, auction=auction)
-                db_session.add(new_bid)
+            bid_amount = bid_form.amount.data
+            user = current_user
 
-                auction.current_price = bid_amount
-                db_session.commit()
+            if not user.is_authenticated:
+                flash('Please log in to place a bid.', 'warning')
+                return redirect(url_for('auth.login'))
 
-                logging.info(
-                    f"New bid placed: User {user.id} bid {bid_amount} on Auction {auction.id}"
-                )
+            if bid_amount <= auction.current_price:
+                flash('Your bid must be higher than the current price.', 'danger')
+            elif user.xtr_balance < bid_amount:
+                flash('You don\'t have enough XTR for this bid.', 'danger')
+            else:
+                try:
+                    new_bid = Bid(amount=bid_amount, bidder=user, auction=auction)
+                    db_session.add(new_bid)
 
-                flash('Ваша ставка успешно размещена!', 'success')
-                return redirect(
-                    url_for('auction_detail', auction_id=auction_id))
-            except Exception as e:
-                db_session.rollback()
-                logging.error(f"Error placing bid: {e}")
-                flash(
-                    'Произошла ошибка при размещении ставки. Пожалуйста, попробуйте позже.',
-                    'danger')
+                    auction.current_price = bid_amount
+                    db_session.commit()
+
+                    logger.info(
+                        f"New bid placed: User {user.id} bid {bid_amount} on Auction {auction.id}"
+                    )
+
+                    flash('Your bid has been successfully placed!', 'success')
+                    return redirect(url_for('auction_detail', auction_id=auction_id))
+                except Exception as e:
+                    db_session.rollback()
+                    logger.error(f"Error placing bid: {e}")
+                    flash(
+                        'An error occurred while placing your bid. Please try again later.',
+                        'danger')
 
     bids = db_session.query(Bid).filter_by(auction_id=auction_id).order_by(
         Bid.amount.desc()).all()
@@ -306,16 +307,16 @@ async def close_auctions():
                 winner = winning_bid.bidder
                 await send_notification(
                     winner.telegram_id,
-                    f"Поздравляем! Вы выиграли аукцион '{auction.title}' с суммой ставки {winning_bid.amount} XTR."
+                    f"Congratulations! You won the auction '{auction.title}' with a bid of {winning_bid.amount} XTR."
                 )
                 await send_notification(
                     auction.creator.telegram_id,
-                    f"Аукцион '{auction.title}' завершён. Победитель: {winner.username} с суммой ставки {winning_bid.amount} XTR."
+                    f"Your auction '{auction.title}' has ended. Winner: {winner.username} with a bid of {winning_bid.amount} XTR."
                 )
             else:
                 await send_notification(
                     auction.creator.telegram_id,
-                    f"Аукцион '{auction.title}' завершился без победителей."
+                    f"Your auction '{auction.title}' has ended without any bids."
                 )
 
             db_session.commit()
