@@ -8,6 +8,7 @@ from telegram.error import BadRequest
 from models import User, Auction
 from db import db_session
 from datetime import datetime
+import json
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -145,7 +146,7 @@ async def buy_stars_yoomoney(update: Update, context):
         }
 
         logger.info(f"Sending payment request to YooMoney for user {user.id}")
-        logger.debug(f"YooMoney API request payload: {payment}")
+        logger.debug(f"YooMoney API request payload: {json.dumps(payment, ensure_ascii=False)}")
         try:
             response = requests.post(YOOMONEY_API_URL,
                                      json=payment,
@@ -158,31 +159,29 @@ async def buy_stars_yoomoney(update: Update, context):
             logger.error(f"YooMoney API response: {response.text if response else 'No response'}")
             if response:
                 logger.error(f"YooMoney API status code: {response.status_code}")
-                logger.error(f"YooMoney API headers: {response.headers}")
-            await update.message.reply_text("There was an error processing your payment request. Please try again later or contact support.")
+                logger.error(f"YooMoney API headers: {json.dumps(dict(response.headers), ensure_ascii=False)}")
+            error_message = "There was an error processing your payment request. Please try again later or contact support."
+            await update.message.reply_text(error_message)
             return
 
         payment_info = response.json()
-        logger.debug(f"YooMoney API response: {payment_info}")
+        logger.debug(f"YooMoney API response: {json.dumps(payment_info, ensure_ascii=False)}")
         confirmation_url = payment_info.get('confirmation', {}).get('confirmation_url')
         if confirmation_url:
             logger.info(f"YooMoney payment created for user {user.id}: {confirmation_url}")
-            await update.message.reply_text(
-                f"Please complete your payment of {amount} XTR ({total_amount} RUB) by clicking the link below:\n{confirmation_url}"
-            )
+            success_message = f"Please complete your payment of {amount} XTR ({total_amount} RUB) by clicking the link below:\n{confirmation_url}"
+            await update.message.reply_text(success_message)
         else:
             logger.error(f"Failed to create YooMoney payment: {response.text}")
             error_code = payment_info.get('code')
             error_description = payment_info.get('description', 'Unknown error')
             logger.error(f"YooMoney error: {error_code} - {error_description}")
-            await update.message.reply_text(
-                f"Sorry, there was an error processing your payment (Error: {error_code}). Please try again later or contact support."
-            )
+            error_message = f"Sorry, there was an error processing your payment (Error: {error_code}). Please try again later or contact support."
+            await update.message.reply_text(error_message)
     except Exception as e:
         logger.error(f"Unexpected error in buy_stars_yoomoney function: {str(e)}", exc_info=True)
-        await update.message.reply_text(
-            "An unexpected error occurred. Please try again later or contact support."
-        )
+        error_message = "An unexpected error occurred. Please try again later or contact support."
+        await update.message.reply_text(error_message)
 
 async def pre_checkout_callback(update: Update, context):
     query = update.pre_checkout_query
