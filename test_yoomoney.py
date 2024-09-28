@@ -1,41 +1,44 @@
 import os
-import requests
-from dotenv import load_dotenv
-load_dotenv()
+import logging
+from yookassa import Configuration, Payment
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-YOOMONEY_SHOP_ID = os.getenv('YOOMONEY_SHOP_ID')
-YOOMONEY_SECRET_KEY = os.getenv('YOOMONEY_SECRET_KEY')
-YOOMONEY_API_URL = 'https://api.yookassa.ru/v3/payments'
+def test_yoomoney_connection():
+    YOOMONEY_SHOP_ID = os.environ.get('YOOMONEY_SHOP_ID')
+    YOOMONEY_SECRET_KEY = os.environ.get('YOOMONEY_SECRET_KEY')
 
-payment = {
-    "amount": {
-        "value": "10.00",
-        "currency": "RUB"
-    },
-    "confirmation": {
-        "type": "redirect",
-        "return_url": "https://yourdomain.com/yoomoney_success"
-    },
-    "capture": True,
-    "description": "Test Payment",
-    "metadata": {
-        "user_id": 1,
-        "amount": 10
-    }
-}
+    logger.info(f"Testing YooMoney connection with Shop ID: {YOOMONEY_SHOP_ID[:5]}...{YOOMONEY_SHOP_ID[-5:] if YOOMONEY_SHOP_ID else 'Not set'}")
 
-headers = {
-    "Content-Type": "application/json"
-}
+    Configuration.account_id = YOOMONEY_SHOP_ID
+    Configuration.secret_key = YOOMONEY_SECRET_KEY
 
-auth = (YOOMONEY_SHOP_ID, YOOMONEY_SECRET_KEY)
+    try:
+        # Attempt to create a minimal payment to test the connection
+        payment = Payment.create({
+            "amount": {
+                "value": "1.00",
+                "currency": "RUB"
+            },
+            "confirmation": {
+                "type": "redirect",
+                "return_url": "https://www.example.com/return_url"
+            },
+            "capture": True,
+            "description": "Test payment"
+        })
 
-response = requests.post(YOOMONEY_API_URL, json=payment, headers=headers, auth=auth)
+        logger.info(f"Successfully created test payment with ID: {payment.id}")
+        logger.info(f"Payment status: {payment.status}")
+        logger.info(f"Confirmation URL: {payment.confirmation.confirmation_url}")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to create test payment: {str(e)}")
+        return False
 
-if response.status_code == 201:
-    print("Payment created successfully")
-    print("Confirmation URL:", response.json()['confirmation']['confirmation_url'])
-else:
-    print("Failed to create payment")
-    print("Response:", response.json())
+if __name__ == "__main__":
+    if test_yoomoney_connection():
+        print("YooMoney API connection test passed successfully.")
+    else:
+        print("YooMoney API connection test failed. Please check your credentials and try again.")
