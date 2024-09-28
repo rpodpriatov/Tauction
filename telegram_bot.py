@@ -81,7 +81,7 @@ async def buy_stars_yoomoney(update: Update, context):
 
         # Set a minimum purchase amount (e.g., 10 XTR)
         min_amount = 10
-        amount = context.args[0] if context.args else min_amount
+        amount = context.args[0] if context.args else str(min_amount)
         try:
             amount = int(amount)
             if amount < min_amount:
@@ -111,8 +111,9 @@ async def buy_stars_yoomoney(update: Update, context):
         }
 
         auth = (YOOMONEY_SHOP_ID, YOOMONEY_SECRET_KEY)
-        headers = {"Content-Type": "application/json"}
+        headers = {"Content-Type": "application/json", "Idempotence-Key": str(datetime.now().timestamp())}
 
+        logger.info(f"Sending payment request to YooMoney for user {user.id}")
         response = requests.post(YOOMONEY_API_URL,
                                  json=payment,
                                  headers=headers,
