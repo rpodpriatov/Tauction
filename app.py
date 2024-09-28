@@ -1,5 +1,3 @@
-# app.py
-
 import os
 import logging
 import time
@@ -21,6 +19,7 @@ from sqlalchemy.orm import sessionmaker
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import hmac
 import hashlib
+from sqlalchemy import desc
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -46,11 +45,47 @@ with app.app_context():
 
 @app.route('/')
 def index():
+    page = request.args.get('page', 1, type=int)
+    per_page = 5  # Number of ended auctions per page
     active_auctions = Auction.query.filter_by(is_active=True).order_by(Auction.end_time.asc()).all()
-    inactive_auctions = Auction.query.filter_by(is_active=False).order_by(Auction.end_time.desc()).limit(5).all()
+    
+    # Use offset and limit for manual pagination
+    total_inactive = Auction.query.filter_by(is_active=False).count()
+    inactive_auctions = Auction.query.filter_by(is_active=False).order_by(desc(Auction.end_time)).offset((page-1)*per_page).limit(per_page).all()
+    
+    # Create a simple pagination object
+    class Pagination:
+        def __init__(self, page, per_page, total_count):
+            self.page = page
+            self.per_page = per_page
+            self.total_count = total_count
+
+        @property
+        def pages(self):
+            return int((self.total_count + self.per_page - 1) / self.per_page)
+
+        @property
+        def has_prev(self):
+            return self.page > 1
+
+        @property
+        def has_next(self):
+            return self.page < self.pages
+
+        @property
+        def prev_num(self):
+            return self.page - 1 if self.has_prev else None
+
+        @property
+        def next_num(self):
+            return self.page + 1 if self.has_next else None
+
+    pagination = Pagination(page, per_page, total_inactive)
+
     return render_template('index.html',
                            active_auctions=active_auctions,
-                           inactive_auctions=inactive_auctions)
+                           inactive_auctions=inactive_auctions,
+                           pagination=pagination)
 
 @app.route('/api/active_auctions', methods=['GET'])
 def get_active_auctions():
