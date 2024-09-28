@@ -46,7 +46,9 @@ with app.app_context():
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    active_auctions = Auction.query.filter_by(is_active=True).all()
+    inactive_auctions = Auction.query.filter_by(is_active=False).all()
+    return render_template('index.html', active_auctions=active_auctions, inactive_auctions=inactive_auctions)
 
 @app.route('/api/active_auctions', methods=['GET'])
 def get_active_auctions():
@@ -168,7 +170,7 @@ def create_auction():
 @app.route('/auction/<int:auction_id>', methods=['GET', 'POST'])
 def auction_detail(auction_id):
     auction = db_session.get(Auction, auction_id)
-    if auction is None or not auction.is_active:
+    if auction is None:
         abort(404)
 
     bid_form = BidForm()
@@ -291,6 +293,7 @@ async def close_auctions():
 
         for auction in ended_auctions:
             auction.is_active = False
+            logger.info(f"Auction {auction.id} marked as inactive")
             logger.info(f"Closing auction {auction.id}: {auction.title}")
 
             if auction.bids:

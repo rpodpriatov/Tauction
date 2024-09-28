@@ -1,41 +1,41 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h1>Welcome to the Auction Platform</h1>
-<div id="active-auctions">
+<div class="container mt-5">
+    <h1>Welcome to the Auction Platform</h1>
+    
     <h2>Active Auctions</h2>
-    <div id="auctions-container">
-        <!-- Auctions will be loaded here dynamically -->
-    </div>
-</div>
-{% endblock %}
+    {% if active_auctions %}
+        <ul class="list-group">
+        {% for auction in active_auctions %}
+            <li class="list-group-item">
+                <h3>{{ auction.title }}</h3>
+                <p>{{ auction.description }}</p>
+                <p>Current Price: {{ auction.current_price }} XTR</p>
+                <p>Ends at: {{ auction.end_time }}</p>
+                <a href="{{ url_for('auction_detail', auction_id=auction.id) }}" class="btn btn-primary">View Details</a>
+            </li>
+        {% endfor %}
+        </ul>
+    {% else %}
+        <p>No active auctions at the moment.</p>
+    {% endif %}
 
-{% block scripts %}
-<script>
-    // Fetch and display active auctions
-    fetch('/api/active_auctions')
-        .then(response => response.json())
-        .then(auctions => {
-            const auctionsContainer = document.getElementById('auctions-container');
-            if (auctions.length === 0) {
-                auctionsContainer.innerHTML = '<p>No active auctions available at the moment.</p>';
-            } else {
-                auctions.forEach(auction => {
-                    const auctionElement = document.createElement('div');
-                    auctionElement.innerHTML = `
-                        <h3>${auction.title}</h3>
-                        <p>Current Price: ${auction.current_price} XTR</p>
-                        <p>Ends at: ${new Date(auction.end_time).toLocaleString()}</p>
-                        <a href="/auction/${auction.id}">View Details</a>
-                    `;
-                    auctionsContainer.appendChild(auctionElement);
-                });
-            }
-        })
-        .catch(error => {
-            console.error('Error fetching auctions:', error);
-            const auctionsContainer = document.getElementById('auctions-container');
-            auctionsContainer.innerHTML = '<p>Error loading auctions. Please try again later.</p>';
-        });
-</script>
+    <h2>Inactive Auctions</h2>
+    {% if inactive_auctions %}
+        <ul class="list-group">
+        {% for auction in inactive_auctions %}
+            <li class="list-group-item">
+                <h3>{{ auction.title }}</h3>
+                <p>{{ auction.description }}</p>
+                <p>Final Price: {{ auction.current_price }} XTR</p>
+                <p>Ended at: {{ auction.end_time }}</p>
+                <a href="{{ url_for('auction_detail', auction_id=auction.id) }}" class="btn btn-secondary">View Details</a>
+            </li>
+        {% endfor %}
+        </ul>
+    {% else %}
+        <p>No inactive auctions to display.</p>
+    {% endif %}
+</div>
 {% endblock %}
