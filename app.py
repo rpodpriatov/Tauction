@@ -34,9 +34,11 @@ logger = logging.getLogger(__name__)
 login_manager = LoginManager(app)
 login_manager.login_view = 'auth.login'
 
+
 @login_manager.user_loader
 def load_user(user_id):
     return db_session.get(User, int(user_id))
+
 
 app.register_blueprint(auth)
 app.register_blueprint(admin)
@@ -44,11 +46,15 @@ app.register_blueprint(admin)
 with app.app_context():
     init_db()
 
+
 @app.route('/')
 def index():
     active_auctions = Auction.query.filter_by(is_active=True).all()
     inactive_auctions = Auction.query.filter_by(is_active=False).all()
-    return render_template('index.html', active_auctions=active_auctions, inactive_auctions=inactive_auctions)
+    return render_template('index.html',
+                           active_auctions=active_auctions,
+                           inactive_auctions=inactive_auctions)
+
 
 @app.route('/api/active_auctions', methods=['GET'])
 def get_active_auctions():
@@ -113,15 +119,18 @@ def get_active_auctions():
                 return jsonify({'error': 'Database connection error'}), 500
             time.sleep(2**attempt)
 
+
 @app.route('/watchlist')
 @login_required
 def watchlist():
     return render_template('watchlist.html', auctions=current_user.watchlist)
 
+
 @app.route('/profile')
 @login_required
 def profile():
     return render_template('profile.html')
+
 
 @app.route('/add_to_watchlist/<int:auction_id>', methods=['POST'])
 @login_required
@@ -135,6 +144,7 @@ def add_to_watchlist(auction_id):
         flash('Аукцион уже в избранном или не существует.', 'warning')
     return redirect(url_for('auction_detail', auction_id=auction_id))
 
+
 @app.route('/remove_from_watchlist/<int:auction_id>', methods=['POST'])
 @login_required
 def remove_from_watchlist(auction_id):
@@ -147,18 +157,18 @@ def remove_from_watchlist(auction_id):
         flash('Аукцион не найден в вашем избранном.', 'warning')
     return redirect(url_for('watchlist'))
 
+
 @app.route('/create_auction', methods=['GET', 'POST'])
 @login_required
 def create_auction():
     form = AuctionForm()
     if form.validate_on_submit():
-        new_auction = Auction(
-            title=form.title.data,
-            description=form.description.data,
-            current_price=form.starting_price.data,
-            end_time=form.end_time.data,
-            is_active=True,
-            creator=current_user)
+        new_auction = Auction(title=form.title.data,
+                              description=form.description.data,
+                              current_price=form.starting_price.data,
+                              end_time=form.end_time.data,
+                              is_active=True,
+                              creator=current_user)
         db_session.add(new_auction)
         db_session.commit()
         flash('Ваш аукцион создан!', 'success')
@@ -166,6 +176,7 @@ def create_auction():
     return render_template('create_auction.html',
                            title='Создать Аукцион',
                            form=form)
+
 
 @app.route('/auction/<int:auction_id>', methods=['GET', 'POST'])
 def auction_detail(auction_id):
@@ -177,7 +188,8 @@ def auction_detail(auction_id):
 
     if bid_form.validate_on_submit():
         if not auction.is_active:
-            flash('This auction has ended. Bidding is no longer allowed.', 'warning')
+            flash('This auction has ended. Bidding is no longer allowed.',
+                  'warning')
         else:
             bid_amount = bid_form.amount.data
             user = current_user
@@ -187,12 +199,15 @@ def auction_detail(auction_id):
                 return redirect(url_for('auth.login'))
 
             if bid_amount <= auction.current_price:
-                flash('Your bid must be higher than the current price.', 'danger')
+                flash('Your bid must be higher than the current price.',
+                      'danger')
             elif user.xtr_balance < bid_amount:
                 flash('You don\'t have enough XTR for this bid.', 'danger')
             else:
                 try:
-                    new_bid = Bid(amount=bid_amount, bidder=user, auction=auction)
+                    new_bid = Bid(amount=bid_amount,
+                                  bidder=user,
+                                  auction=auction)
                     db_session.add(new_bid)
 
                     auction.current_price = bid_amount
@@ -203,7 +218,8 @@ def auction_detail(auction_id):
                     )
 
                     flash('Your bid has been successfully placed!', 'success')
-                    return redirect(url_for('auction_detail', auction_id=auction_id))
+                    return redirect(
+                        url_for('auction_detail', auction_id=auction_id))
                 except Exception as e:
                     db_session.rollback()
                     logger.error(f"Error placing bid: {e}")
@@ -219,18 +235,22 @@ def auction_detail(auction_id):
                            bids=bids,
                            bid_form=bid_form)
 
+
 @app.errorhandler(404)
 def not_found_error(error):
     return render_template('errors/404.html'), 404
+
 
 @app.errorhandler(500)
 def internal_error(error):
     db_session.rollback()
     return render_template('errors/500.html'), 500
 
+
 @app.teardown_appcontext
 def shutdown_session(exception=None):
     db_session.remove()
+
 
 @app.route('/yoomoney_ipn', methods=['POST'])
 def yoomoney_ipn():
@@ -283,14 +303,14 @@ def yoomoney_ipn():
         logger.error(f"Error processing YooMoney IPN: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
+
+# Функция для закрытия аукционов
 async def close_auctions():
     current_time = datetime.utcnow()
     logger.info(f"Running close_auctions at {current_time}")
     try:
         ended_auctions = db_session.query(Auction).filter(
-            Auction.end_time <= current_time, 
-            Auction.is_active == True
-        ).all()
+            Auction.end_time <= current_time, Auction.is_active == True).all()
 
         logger.info(f"Found {len(ended_auctions)} auctions to close")
 
@@ -328,12 +348,14 @@ async def close_auctions():
         logger.error(f"Error in close_auctions: {str(e)}")
         db_session.rollback()
 
+
+# Основная асинхронная функция
 async def main():
     bot_application = setup_bot()
     scheduler = AsyncIOScheduler()
     scheduler.add_job(close_auctions, 'interval', minutes=1)
     scheduler.start()
-    
+
     async def start_bot():
         await bot_application.initialize()
         await bot_application.start()
@@ -341,7 +363,9 @@ async def main():
 
     async def start_app():
         config = HyperConfig()
-        config.bind = [f"{os.getenv('HOST', '0.0.0.0')}:{os.getenv('PORT', '5000')}"]
+        config.bind = [
+            f"{os.getenv('HOST', '0.0.0.0')}:{os.getenv('PORT', '5000')}"
+        ]
         config.use_reloader = False
         await serve(app, config)
 
@@ -355,6 +379,7 @@ async def main():
         await bot_application.shutdown()
         scheduler.shutdown()
         logging.info("Application shutdown complete")
+
 
 if __name__ == '__main__':
     asyncio.run(main())

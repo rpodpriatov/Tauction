@@ -1,21 +1,27 @@
 import os
 import logging
-import re
 from telegram import Update
-from telegram.ext import (Application, CommandHandler, PreCheckoutQueryHandler,
-                          MessageHandler, filters, ConversationHandler, CallbackContext)
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    PreCheckoutQueryHandler,
+    MessageHandler,
+    filters
+)
 from telegram.error import BadRequest
 from models import User, Auction
 from db import db_session
 from datetime import datetime
 from yookassa import Configuration, Payment
 
+# Настройка логирования
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO)
+    level=logging.INFO
+)
 logger = logging.getLogger(__name__)
 
-# YooMoney API Configuration
+# Конфигурация YooMoney API
 YOOMONEY_SHOP_ID = os.environ.get('YOOMONEY_SHOP_ID')
 YOOMONEY_SECRET_KEY = os.environ.get('YOOMONEY_SECRET_KEY')
 YOOMONEY_SHOP_ARTICLE_ID = os.environ.get('YOOMONEY_SHOP_ARTICLE_ID')
@@ -23,53 +29,45 @@ YOOMONEY_SHOP_ARTICLE_ID = os.environ.get('YOOMONEY_SHOP_ARTICLE_ID')
 Configuration.account_id = YOOMONEY_SHOP_ID
 Configuration.secret_key = YOOMONEY_SECRET_KEY
 
-application = None  # Global variable for the bot
+application = None  # Глобальная переменная для бота
 
-# Define conversation states
-EMAIL = 1
-
-def validate_yoomoney_config():
-    if not all([YOOMONEY_SHOP_ID, YOOMONEY_SECRET_KEY, YOOMONEY_SHOP_ARTICLE_ID]):
-        missing_vars = [var for var in ['YOOMONEY_SHOP_ID', 'YOOMONEY_SECRET_KEY', 'YOOMONEY_SHOP_ARTICLE_ID'] if not globals().get(var)]
-        logger.error(f"YooMoney configuration is incomplete. Missing variables: {', '.join(missing_vars)}")
-        return False
-    
-    if Configuration.account_id != YOOMONEY_SHOP_ID or Configuration.secret_key != YOOMONEY_SECRET_KEY:
-        logger.error("YooMoney Configuration does not match environment variables")
-        return False
-    
-    return True
-
+# Обработчик команды /start
 async def start(update: Update, context):
     logger.info(f"User {update.effective_user.id} started the bot")
     await update.message.reply_text(
         'Welcome to the Auction Platform Bot! Use /buy_stars_yoomoney to purchase XTR stars.'
     )
 
-async def buy_stars_yoomoney(update: Update, context: CallbackContext):
+# Обработчик команды /buy_stars_yoomoney
+async def buy_stars_yoomoney(update: Update, context):
     logger.info(f"buy_stars_yoomoney function called by user {update.effective_user.id}")
     try:
-        # Step 1: Validate YooMoney configuration
-        if not validate_yoomoney_config():
+        # Шаг 1: Проверка настроек YooMoney
+        logger.info("Checking YooMoney configuration")
+        if not all([YOOMONEY_SHOP_ID, YOOMONEY_SECRET_KEY, YOOMONEY_SHOP_ARTICLE_ID]):
+            missing_vars = [var for var in ['YOOMONEY_SHOP_ID', 'YOOMONEY_SECRET_KEY', 'YOOMONEY_SHOP_ARTICLE_ID'] if not os.environ.get(var)]
+            logger.error(f"YooMoney configuration is incomplete. Missing variables: {', '.join(missing_vars)}")
             await update.message.reply_text("Sorry, YooMoney payments are not available at the moment. Please try again later or contact support.")
-            return ConversationHandler.END
+            return
 
-        # Step 2: Get or create user
+        # Шаг 2: Получение или создание пользователя
         logger.info("Getting or creating user")
         user_id = update.effective_user.id
         user = db_session.query(User).filter_by(telegram_id=str(user_id)).first()
         if not user:
             logger.info(f"Creating new user for Telegram ID: {user_id}")
-            user = User(telegram_id=str(user_id),
-                        username=update.effective_user.username or 'Unknown',
-                        xtr_balance=0)
+            user = User(
+                telegram_id=str(user_id),
+                username=update.effective_user.username or 'Unknown',
+                xtr_balance=0
+            )
             db_session.add(user)
             db_session.commit()
             logger.info(f"Created new user: {user.id}")
         else:
             logger.info(f"Found existing user: {user.id}")
 
-        # Step 3: Parse and validate amount
+        # Шаг 3: Парсинг и валидация суммы
         logger.info("Parsing and validating amount")
         min_amount = 10
         amount = context.args[0] if context.args else str(min_amount)
@@ -78,40 +76,16 @@ async def buy_stars_yoomoney(update: Update, context: CallbackContext):
             if amount < min_amount:
                 logger.warning(f"User {user_id} attempted to purchase less than the minimum amount")
                 await update.message.reply_text(f"Minimum purchase amount is {min_amount} XTR. Please try again with a larger amount.")
-                return ConversationHandler.END
+                return
         except ValueError:
             logger.warning(f"User {user_id} provided an invalid amount: {amount}")
             await update.message.reply_text("Please provide a valid number of XTR to purchase. For example: /buy_stars_yoomoney 15")
-            return ConversationHandler.END
+            return
 
-        # Store the amount in the user's context
-        context.user_data['amount'] = amount
-
-        # Step 4: Prompt for email
-        await update.message.reply_text("Please provide your email address for the receipt:")
-        return EMAIL
-
-    except Exception as e:
-        logger.error(f"Unexpected error in buy_stars_yoomoney function: {str(e)}", exc_info=True)
-        error_message = "An unexpected error occurred. Please try again later or contact support."
-        await update.message.reply_text(error_message)
-        return ConversationHandler.END
-
-async def process_email(update: Update, context: CallbackContext):
-    email = update.message.text
-    user_id = update.effective_user.id
-    amount = context.user_data.get('amount')
-
-    # Validate email
-    if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
-        await update.message.reply_text("Invalid email format. Please provide a valid email address.")
-        return EMAIL
-
-    try:
-        # Prepare payment data
+        # Шаг 4: Подготовка данных платежа
         logger.info(f"Preparing payment data for {amount} XTR")
         total_amount = amount * 10  # 1 XTR = 10 RUB
-        
+
         payment_data = {
             "amount": {
                 "value": f"{total_amount:.2f}",
@@ -122,16 +96,15 @@ async def process_email(update: Update, context: CallbackContext):
                 "return_url": f"{os.getenv('BASE_URL', 'https://your-domain.com')}/yoomoney_success"
             },
             "capture": True,
-            "description": f"Purchase of {amount} XTR stars for user {user_id}",
+            "description": f"Purchase of {amount} XTR stars for user {user.id}",
             "metadata": {
-                "user_id": user_id,
+                "user_id": user.id,
                 "amount": amount
             },
             "receipt": {
                 "customer": {
-                    "full_name": update.effective_user.full_name,
-                    "phone": "",
-                    "email": email
+                    "full_name": update.effective_user.full_name
+                    # Удалены пустые поля "phone" и "email"
                 },
                 "items": [
                     {
@@ -149,15 +122,11 @@ async def process_email(update: Update, context: CallbackContext):
             }
         }
 
-        if YOOMONEY_SHOP_ARTICLE_ID:
-            payment_data["merchant_article_id"] = YOOMONEY_SHOP_ARTICLE_ID
-
         logger.info(f"Payment data prepared: {payment_data}")
-        logger.info(f"Email used for payment (masked): {email[:3]}...{email[-3:]}")
 
         try:
             payment = Payment.create(payment_data)
-            logger.info(f"YooMoney payment created for user {user_id}: {payment.id}")
+            logger.info(f"YooMoney payment created for user {user.id}: {payment.id}")
             confirmation_url = payment.confirmation.confirmation_url
             if confirmation_url:
                 success_message = f"Please complete your payment of {amount} XTR ({total_amount} RUB) by clicking the link below:\n{confirmation_url}"
@@ -172,12 +141,11 @@ async def process_email(update: Update, context: CallbackContext):
             await update.message.reply_text(error_message)
 
     except Exception as e:
-        logger.error(f"Unexpected error in process_email function: {str(e)}", exc_info=True)
+        logger.error(f"Unexpected error in buy_stars_yoomoney function: {str(e)}", exc_info=True)
         error_message = "An unexpected error occurred. Please try again later or contact support."
         await update.message.reply_text(error_message)
 
-    return ConversationHandler.END
-
+# Обработчик предоплаты
 async def pre_checkout_callback(update: Update, context):
     query = update.pre_checkout_query
     if query.invoice_payload != "Custom-Payload":
@@ -185,9 +153,10 @@ async def pre_checkout_callback(update: Update, context):
     else:
         await query.answer(ok=True)
 
+# Обработчик успешной оплаты
 async def successful_payment_callback(update: Update, context):
     user_id = update.effective_user.id
-    amount = update.message.successful_payment.total_amount // 100  # Convert cents to rubles
+    amount = update.message.successful_payment.total_amount // 100  # Конвертация копеек в рубли
 
     user = db_session.query(User).filter_by(telegram_id=str(user_id)).first()
     if user:
@@ -197,55 +166,47 @@ async def successful_payment_callback(update: Update, context):
             f'Thank you for your payment! {amount} XTR stars have been added to your balance.'
         )
     else:
-        new_user = User(telegram_id=str(user_id),
-                        username=update.effective_user.username,
-                        xtr_balance=amount)
+        new_user = User(
+            telegram_id=str(user_id),
+            username=update.effective_user.username,
+            xtr_balance=amount
+        )
         db_session.add(new_user)
         db_session.commit()
         await update.message.reply_text(
             f'Thank you for your payment! A new account has been created for you with {amount} XTR stars.'
         )
 
+# Настройка бота
 def setup_bot() -> Application:
     global application
     bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
     if not bot_token:
-        logger.error(
-            "TELEGRAM_BOT_TOKEN is not set in the environment variables")
-        raise ValueError(
-            "TELEGRAM_BOT_TOKEN is not set in the environment variables")
+        logger.error("TELEGRAM_BOT_TOKEN is not set in the environment variables")
+        raise ValueError("TELEGRAM_BOT_TOKEN is not set in the environment variables")
 
-    logger.info(
-        f"Setting up bot with token: {bot_token[:5]}...{bot_token[-5:]}")
+    logger.info(f"Setting up bot with token: {bot_token[:5]}...{bot_token[-5:]}")
 
     application = Application.builder().token(bot_token).build()
 
     logger.info("Adding command handlers")
     application.add_handler(CommandHandler('start', start))
-    
-    # Create a conversation handler for the buy_stars_yoomoney command
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler('buy_stars_yoomoney', buy_stars_yoomoney)],
-        states={
-            EMAIL: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_email)]
-        },
-        fallbacks=[CommandHandler('cancel', lambda u, c: ConversationHandler.END)]
-    )
-    application.add_handler(conv_handler)
-    
+    application.add_handler(CommandHandler('buy_stars_yoomoney', buy_stars_yoomoney))
     application.add_handler(PreCheckoutQueryHandler(pre_checkout_callback))
     application.add_handler(
         MessageHandler(filters.SUCCESSFUL_PAYMENT,
                        successful_payment_callback))
+    # Добавьте дополнительные обработчики команд по необходимости
 
     logger.info("Bot setup completed")
     return application
 
+# Функция для отправки уведомлений
 async def send_notification(user_id: int, message: str):
+    logger.info(f"send_notification called with user_id={user_id}, message={message}")
     if application:
         try:
-            await application.bot.send_message(chat_id=int(user_id),
-                                               text=message)
+            await application.bot.send_message(chat_id=int(user_id), text=message)
             logger.info(f"Notification sent to user {user_id}")
         except BadRequest as e:
             logger.error(
@@ -253,51 +214,7 @@ async def send_notification(user_id: int, message: str):
             )
         except Exception as e:
             logger.error(
-                f"Error sending notification to user {user_id}: {str(e)}")
+                f"Error sending notification to user {user_id}: {str(e)}"
+            )
     else:
         logger.error("Telegram application is not initialized.")
-
-def test_yoomoney_connection():
-    try:
-        # Create a test payment with a small amount
-        test_payment = Payment.create({
-            "amount": {
-                "value": "1.00",
-                "currency": "RUB"
-            },
-            "confirmation": {
-                "type": "redirect",
-                "return_url": "https://28a049bf-d335-42ae-85a0-10cc9620e09d-00-1ri3afroqi0sf.spock.replit.dev"
-            },
-            "capture": False,
-            "description": "Test payment",
-            "receipt": {
-                "customer": {
-                    "email": "test@example.com"
-                },
-                "items": [
-                    {
-                        "description": "Test item",
-                        "quantity": "1",
-                        "amount": {
-                            "value": "1.00",
-                            "currency": "RUB"
-                        },
-                        "vat_code": "1"
-                    }
-                ]
-            }
-        })
-        logger.info(f"Test payment created successfully: {test_payment.id}")
-        logger.info(f"Test payment details: {test_payment.json()}")
-        return True
-    except Exception as e:
-        logger.error(f"Error in test_yoomoney_connection: {str(e)}")
-        logger.exception("Detailed traceback:")
-        return False
-
-# Run the test connection function
-if test_yoomoney_connection():
-    logger.info("YooMoney connection test passed")
-else:
-    logger.error("YooMoney connection test failed")
