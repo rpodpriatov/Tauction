@@ -46,8 +46,8 @@ async def buy_stars(update: Update, context):
             await update.message.reply_text(
                 "Sorry, star purchases are not available at the moment.")
             return
-        currency = "RUB"  # Обычно валюта указывается как "RUB" или другая валюта, а не "XTR"
-        price = 1000  # Цена в копейках (10.00 RUB)
+        currency = "RUB"
+        price = 1000
         prices = [LabeledPrice("XTR Stars", price)]
 
         logger.info(f"Sending invoice to user {update.effective_user.id}")
@@ -78,7 +78,7 @@ async def buy_stars_yoomoney(update: Update, context):
         if not user:
             logger.info(f"Creating new user for Telegram ID: {user_id}")
             user = User(telegram_id=str(user_id),
-                        username=update.effective_user.username,
+                        username=update.effective_user.username or 'Unknown',
                         xtr_balance=0)
             db_session.add(user)
             db_session.commit()
@@ -122,8 +122,8 @@ async def buy_stars_yoomoney(update: Update, context):
             "receipt": {
                 "customer": {
                     "full_name": update.effective_user.full_name,
-                    "phone": "",  # You might want to ask for the user's phone number separately
-                    "email": ""  # You might want to ask for the user's email separately
+                    "phone": "",
+                    "email": ""
                 },
                 "items": [
                     {
@@ -148,10 +148,10 @@ async def buy_stars_yoomoney(update: Update, context):
 
         # Step 5: Prepare API request
         logger.info("Preparing YooMoney API request")
-        auth = (YOOMONEY_SHOP_ID, YOOMONEY_SECRET_KEY)
         headers = {
             "Content-Type": "application/json",
-            "Idempotence-Key": str(datetime.now().timestamp())
+            "Idempotence-Key": str(datetime.now().timestamp()),
+            "Authorization": f"Basic {YOOMONEY_SHOP_ID}:{YOOMONEY_SECRET_KEY}"
         }
 
         # Step 6: Send API request
@@ -161,11 +161,17 @@ async def buy_stars_yoomoney(update: Update, context):
             response = requests.post(YOOMONEY_API_URL,
                                      json=payment,
                                      headers=headers,
-                                     auth=auth,
-                                     timeout=10)  # Add a timeout to the request
+                                     timeout=10)
             logger.info(f"YooMoney API response status code: {response.status_code}")
             logger.debug(f"YooMoney API response headers: {json.dumps(dict(response.headers), ensure_ascii=False)}")
-            response.raise_for_status()  # Raise an exception for non-200 status codes
+            logger.debug(f"YooMoney API response body: {response.text}")
+            
+            if response.status_code == 401:
+                logger.error("Authentication failed. Check YOOMONEY_SHOP_ID and YOOMONEY_SECRET_KEY.")
+                await update.message.reply_text("Sorry, there was an authentication error. Please contact support.")
+                return
+            
+            response.raise_for_status()
         except requests.exceptions.RequestException as e:
             logger.error(f"Error in YooMoney API request: {str(e)}")
             logger.error(f"YooMoney API response: {response.text if response else 'No response'}")
@@ -239,7 +245,8 @@ def setup_bot() -> Application:
     logger.info("Adding command handlers")
     application.add_handler(CommandHandler('start', start))
     application.add_handler(CommandHandler('buy_stars', buy_stars))
-    application.add_handler(CommandHandler('buy_stars_yoomoney', buy_stars_yoomoney))
+    application.add_handler(
+        CommandHandler('buy_stars_yoomoney', buy_stars_yoomoney))
     application.add_handler(PreCheckoutQueryHandler(pre_checkout_callback))
     application.add_handler(
         MessageHandler(filters.SUCCESSFUL_PAYMENT,
