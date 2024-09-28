@@ -1,14 +1,13 @@
 import os
 import logging
-import requests
-from telegram import Update, LabeledPrice
+from telegram import Update
 from telegram.ext import (Application, CommandHandler, PreCheckoutQueryHandler,
                           MessageHandler, filters)
 from telegram.error import BadRequest
 from models import User, Auction
 from db import db_session
 from datetime import datetime
-import json
+from yookassa import Configuration, Payment
 
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -19,46 +18,17 @@ logger = logging.getLogger(__name__)
 YOOMONEY_SHOP_ID = os.environ.get('YOOMONEY_SHOP_ID')
 YOOMONEY_SECRET_KEY = os.environ.get('YOOMONEY_SECRET_KEY')
 YOOMONEY_SHOP_ARTICLE_ID = os.environ.get('YOOMONEY_SHOP_ARTICLE_ID')
-YOOMONEY_API_URL = 'https://api.yookassa.ru/v3/payments'
 
-application = None  # Глобальная переменная для бота
+Configuration.account_id = YOOMONEY_SHOP_ID
+Configuration.secret_key = YOOMONEY_SECRET_KEY
+
+application = None  # Global variable for the bot
 
 async def start(update: Update, context):
     logger.info(f"User {update.effective_user.id} started the bot")
     await update.message.reply_text(
-        'Welcome to the Auction Platform Bot! Use /buy_stars to purchase XTR stars.'
+        'Welcome to the Auction Platform Bot! Use /buy_stars_yoomoney to purchase XTR stars.'
     )
-
-async def buy_stars(update: Update, context):
-    logger.info(
-        f"buy_stars function called by user {update.effective_user.id}")
-    try:
-        chat_id = update.effective_chat.id
-        title = "XTR Stars Purchase"
-        description = "Purchase XTR stars for use in auctions"
-        payload = "Custom-Payload"
-        provider_token = os.environ.get('PAYMENT_PROVIDER_TOKEN')
-        logger.info(
-            f"PAYMENT_PROVIDER_TOKEN: {'Set' if provider_token else 'Not set'}"
-        )
-        if not provider_token:
-            logger.error("PAYMENT_PROVIDER_TOKEN is not set")
-            await update.message.reply_text(
-                "Sorry, star purchases are not available at the moment.")
-            return
-        currency = "RUB"
-        price = 1000
-        prices = [LabeledPrice("XTR Stars", price)]
-
-        logger.info(f"Sending invoice to user {update.effective_user.id}")
-        await context.bot.send_invoice(chat_id, title, description, payload,
-                                       provider_token, currency, prices)
-        logger.info(f"Invoice sent to user {update.effective_user.id}")
-    except Exception as e:
-        logger.error(f"Error in buy_stars function: {str(e)}")
-        await update.message.reply_text(
-            "Sorry, there was an error processing your request. Please try again later."
-        )
 
 async def buy_stars_yoomoney(update: Update, context):
     logger.info(f"buy_stars_yoomoney function called by user {update.effective_user.id}")
@@ -104,7 +74,8 @@ async def buy_stars_yoomoney(update: Update, context):
         # Step 4: Prepare payment data
         logger.info(f"Preparing payment data for {amount} XTR")
         total_amount = amount * 10  # 1 XTR = 10 RUB
-        payment = {
+        
+        payment = Payment.create({
             "amount": {
                 "value": f"{total_amount:.2f}",
                 "currency": "RUB"
@@ -138,63 +109,19 @@ async def buy_stars_yoomoney(update: Update, context):
                         "payment_subject": "service"
                     }
                 ]
-            },
-            "merchant_customer_id": str(user.id),
-            "save_payment_method": False
-        }
+            }
+        })
 
-        if YOOMONEY_SHOP_ARTICLE_ID:
-            payment["merchant_article_id"] = YOOMONEY_SHOP_ARTICLE_ID
-
-        # Step 5: Prepare API request
-        logger.info("Preparing YooMoney API request")
-        headers = {
-            "Content-Type": "application/json",
-            "Idempotence-Key": str(datetime.now().timestamp()),
-            "Authorization": f"Basic {YOOMONEY_SHOP_ID}:{YOOMONEY_SECRET_KEY}"
-        }
-
-        # Step 6: Send API request
-        logger.info(f"Sending payment request to YooMoney for user {user.id}")
-        logger.debug(f"YooMoney API request payload: {json.dumps(payment, ensure_ascii=False)}")
-        try:
-            response = requests.post(YOOMONEY_API_URL,
-                                     json=payment,
-                                     headers=headers,
-                                     timeout=10)
-            logger.info(f"YooMoney API response status code: {response.status_code}")
-            logger.debug(f"YooMoney API response headers: {json.dumps(dict(response.headers), ensure_ascii=False)}")
-            logger.debug(f"YooMoney API response body: {response.text}")
-            
-            if response.status_code == 401:
-                logger.error("Authentication failed. Check YOOMONEY_SHOP_ID and YOOMONEY_SECRET_KEY.")
-                await update.message.reply_text("Sorry, there was an authentication error. Please contact support.")
-                return
-            
-            response.raise_for_status()
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error in YooMoney API request: {str(e)}")
-            logger.error(f"YooMoney API response: {response.text if response else 'No response'}")
-            error_message = "There was an error processing your payment request. Please try again later or contact support."
-            await update.message.reply_text(error_message)
-            return
-
-        # Step 7: Process API response
-        logger.info("Processing YooMoney API response")
-        payment_info = response.json()
-        logger.debug(f"YooMoney API response: {json.dumps(payment_info, ensure_ascii=False)}")
-        confirmation_url = payment_info.get('confirmation', {}).get('confirmation_url')
+        logger.info(f"YooMoney payment created for user {user.id}: {payment.id}")
+        confirmation_url = payment.confirmation.confirmation_url
         if confirmation_url:
-            logger.info(f"YooMoney payment created for user {user.id}: {confirmation_url}")
             success_message = f"Please complete your payment of {amount} XTR ({total_amount} RUB) by clicking the link below:\n{confirmation_url}"
             await update.message.reply_text(success_message)
         else:
-            logger.error(f"Failed to create YooMoney payment: {response.text}")
-            error_code = payment_info.get('code')
-            error_description = payment_info.get('description', 'Unknown error')
-            logger.error(f"YooMoney error: {error_code} - {error_description}")
-            error_message = f"Sorry, there was an error processing your payment (Error: {error_code}). Please try again later or contact support."
+            logger.error(f"Failed to create YooMoney payment: {payment.status}")
+            error_message = f"Sorry, there was an error processing your payment. Please try again later or contact support."
             await update.message.reply_text(error_message)
+
     except Exception as e:
         logger.error(f"Unexpected error in buy_stars_yoomoney function: {str(e)}", exc_info=True)
         error_message = "An unexpected error occurred. Please try again later or contact support."
@@ -244,9 +171,7 @@ def setup_bot() -> Application:
 
     logger.info("Adding command handlers")
     application.add_handler(CommandHandler('start', start))
-    application.add_handler(CommandHandler('buy_stars', buy_stars))
-    application.add_handler(
-        CommandHandler('buy_stars_yoomoney', buy_stars_yoomoney))
+    application.add_handler(CommandHandler('buy_stars_yoomoney', buy_stars_yoomoney))
     application.add_handler(PreCheckoutQueryHandler(pre_checkout_callback))
     application.add_handler(
         MessageHandler(filters.SUCCESSFUL_PAYMENT,
