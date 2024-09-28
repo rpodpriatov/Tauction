@@ -1,6 +1,7 @@
 import os
 import logging
 import time
+import signal
 from flask import Flask, render_template, redirect, url_for, jsonify, request, flash, abort
 from flask_login import LoginManager, login_required, current_user
 from config import Config
@@ -33,6 +34,9 @@ logger = logging.getLogger(__name__)
 login_manager = LoginManager(app)
 login_manager.login_view = 'auth.login'
 
+bot_application = None
+scheduler = None
+
 @login_manager.user_loader
 def load_user(user_id):
     return db_session.get(User, int(user_id))
@@ -46,14 +50,12 @@ with app.app_context():
 @app.route('/')
 def index():
     page = request.args.get('page', 1, type=int)
-    per_page = 5  # Number of ended auctions per page
+    per_page = 5
     active_auctions = Auction.query.filter_by(is_active=True).order_by(Auction.end_time.asc()).all()
     
-    # Use offset and limit for manual pagination
     total_inactive = Auction.query.filter_by(is_active=False).count()
     inactive_auctions = Auction.query.filter_by(is_active=False).order_by(desc(Auction.end_time)).offset((page-1)*per_page).limit(per_page).all()
     
-    # Create a simple pagination object
     class Pagination:
         def __init__(self, page, per_page, total_count):
             self.page = page
@@ -398,7 +400,48 @@ async def close_auctions():
         logger.error(f"Error in close_auctions: {str(e)}")
         db_session.rollback()
 
+async def shutdown(signal, loop):
+    logging.info(f"Received exit signal {signal.name}...")
+    
+    logging.info("Stopping web application...")
+    await app.shutdown()
+    
+    if bot_application:
+        logging.info("Stopping Telegram bot...")
+        await bot_application.shutdown()
+    
+    if scheduler:
+        logging.info("Stopping scheduler...")
+        scheduler.shutdown(wait=False)
+    
+    logging.info("Closing database connections...")
+    db_session.remove()
+    
+    tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
+    [task.cancel() for task in tasks]
+    logging.info(f"Cancelling {len(tasks)} outstanding tasks")
+    await asyncio.gather(*tasks, return_exceptions=True)
+    
+    logging.info("Stopping event loop...")
+    loop.stop()
+
+def handle_exception(loop, context):
+    msg = context.get("exception", context["message"])
+    logging.error(f"Caught exception: {msg}")
+    logging.info("Shutting down...")
+    asyncio.create_task(shutdown(signal.SIGTERM, loop))
+
 async def main():
+    global bot_application, scheduler
+    
+    loop = asyncio.get_running_loop()
+    signals = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT)
+    for s in signals:
+        loop.add_signal_handler(
+            s, lambda s=s: asyncio.create_task(shutdown(s, loop)))
+    
+    loop.set_exception_handler(handle_exception)
+    
     bot_application = setup_bot()
     scheduler = AsyncIOScheduler()
     scheduler.add_job(close_auctions, 'interval', minutes=1)
@@ -424,9 +467,7 @@ async def main():
     except Exception as e:
         logging.error(f"Error in main function: {e}")
     finally:
-        await bot_application.shutdown()
-        scheduler.shutdown()
-        logging.info("Application shutdown complete")
+        await shutdown(signal.SIGTERM, loop)
 
 if __name__ == '__main__':
     asyncio.run(main())
