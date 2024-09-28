@@ -425,6 +425,8 @@ async def shutdown(signal, loop):
     logging.info("Stopping event loop...")
     loop.stop()
 
+    logging.info("Shutdown process completed successfully.")
+
 def handle_exception(loop, context):
     msg = context.get("exception", context["message"])
     logging.error(f"Caught exception: {msg}")
