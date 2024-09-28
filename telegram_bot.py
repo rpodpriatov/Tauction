@@ -75,7 +75,7 @@ async def buy_stars_yoomoney(update: Update, context):
         logger.info(f"Preparing payment data for {amount} XTR")
         total_amount = amount * 10  # 1 XTR = 10 RUB
         
-        payment = Payment.create({
+        payment_data = {
             "amount": {
                 "value": f"{total_amount:.2f}",
                 "currency": "RUB"
@@ -110,16 +110,24 @@ async def buy_stars_yoomoney(update: Update, context):
                     }
                 ]
             }
-        })
+        }
 
-        logger.info(f"YooMoney payment created for user {user.id}: {payment.id}")
-        confirmation_url = payment.confirmation.confirmation_url
-        if confirmation_url:
-            success_message = f"Please complete your payment of {amount} XTR ({total_amount} RUB) by clicking the link below:\n{confirmation_url}"
-            await update.message.reply_text(success_message)
-        else:
-            logger.error(f"Failed to create YooMoney payment: {payment.status}")
-            error_message = f"Sorry, there was an error processing your payment. Please try again later or contact support."
+        logger.info(f"Payment data prepared: {payment_data}")
+
+        try:
+            payment = Payment.create(payment_data)
+            logger.info(f"YooMoney payment created for user {user.id}: {payment.id}")
+            confirmation_url = payment.confirmation.confirmation_url
+            if confirmation_url:
+                success_message = f"Please complete your payment of {amount} XTR ({total_amount} RUB) by clicking the link below:\n{confirmation_url}"
+                await update.message.reply_text(success_message)
+            else:
+                logger.error(f"Failed to create YooMoney payment: {payment.status}")
+                error_message = f"Sorry, there was an error processing your payment. Please try again later or contact support."
+                await update.message.reply_text(error_message)
+        except Exception as api_error:
+            logger.error(f"YooMoney API error: {str(api_error)}")
+            error_message = f"An error occurred while processing your payment: {str(api_error)}. Please try again later or contact support."
             await update.message.reply_text(error_message)
 
     except Exception as e:
@@ -195,3 +203,30 @@ async def send_notification(user_id: int, message: str):
                 f"Error sending notification to user {user_id}: {str(e)}")
     else:
         logger.error("Telegram application is not initialized.")
+
+def test_yoomoney_connection():
+    try:
+        # Create a test payment with a small amount
+        test_payment = Payment.create({
+            "amount": {
+                "value": "1.00",
+                "currency": "RUB"
+            },
+            "confirmation": {
+                "type": "redirect",
+                "return_url": "https://www.example.com/return_url"
+            },
+            "capture": False,
+            "description": "Test payment"
+        })
+        logger.info(f"Test payment created successfully: {test_payment.id}")
+        return True
+    except Exception as e:
+        logger.error(f"Error in test_yoomoney_connection: {str(e)}")
+        return False
+
+# Run the test connection function
+if test_yoomoney_connection():
+    logger.info("YooMoney connection test passed")
+else:
+    logger.error("YooMoney connection test failed")
