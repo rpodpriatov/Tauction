@@ -25,7 +25,10 @@ class User(UserMixin, Base):
     watchlist = relationship('Auction', secondary=auction_watchlist, back_populates='watchers')
 
     # One-to-many relationship with Auction for created auctions
-    auctions = relationship('Auction', back_populates='creator')
+    auctions = relationship('Auction', back_populates='creator', foreign_keys='Auction.creator_id')
+
+    # One-to-many relationship with Auction for won auctions
+    won_auctions = relationship('Auction', back_populates='winner', foreign_keys='Auction.winner_id')
 
     # One-to-one relationship with Subscriber
     subscriber_id = Column(Integer, ForeignKey('subscribers.id'), nullable=True)
@@ -52,7 +55,11 @@ class Auction(Base):
 
     # Many-to-one relationship with User for creator
     creator_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    creator = relationship('User', back_populates='auctions')
+    creator = relationship('User', back_populates='auctions', foreign_keys=[creator_id])
+
+    # Many-to-one relationship with User for winner
+    winner_id = Column(Integer, ForeignKey('users.id'), nullable=True)
+    winner = relationship('User', back_populates='won_auctions', foreign_keys=[winner_id])
 
     # One-to-many relationship with Bid for auction bids
     bids = relationship('Bid', back_populates='auction', order_by="Bid.amount.desc()", cascade="all, delete-orphan")

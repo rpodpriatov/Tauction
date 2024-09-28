@@ -377,6 +377,7 @@ async def close_auctions():
             if auction.bids:
                 winning_bid = max(auction.bids, key=lambda bid: bid.amount)
                 winner = winning_bid.bidder
+                auction.winner = winner
                 await send_notification(
                     winner.telegram_id,
                     f"Congratulations! You won the auction '{auction.title}' with a bid of {winning_bid.amount} XTR."

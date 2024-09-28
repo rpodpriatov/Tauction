@@ -36,15 +36,19 @@
                 </div>
                 <div class="card-body">
                     {% if inactive_auctions %}
-                        <ul class="list-group list-group-flush">
+                        <div class="list-group">
                         {% for auction in inactive_auctions %}
-                            <li class="list-group-item">
-                                <h6>{{ auction.title }}</h6>
+                            <div class="list-group-item">
+                                <h5 class="mb-1">{{ auction.title }}</h5>
                                 <p class="mb-1"><strong>Final Price:</strong> {{ auction.current_price }} XTR</p>
+                                <p class="mb-1"><strong>Winner:</strong> {{ auction.winner.username if auction.winner else 'No winner' }}</p>
                                 <small class="text-muted">Ended: {{ auction.end_time.strftime('%Y-%m-%d %H:%M') }}</small>
-                            </li>
+                                <div class="mt-2">
+                                    <a href="{{ url_for('auction_detail', auction_id=auction.id) }}" class="btn btn-sm btn-primary">View Details</a>
+                                </div>
+                            </div>
                         {% endfor %}
-                        </ul>
+                        </div>
                     {% else %}
                         <p class="mb-0">No recently ended auctions.</p>
                     {% endif %}
