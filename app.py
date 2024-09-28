@@ -34,11 +34,9 @@ logger = logging.getLogger(__name__)
 login_manager = LoginManager(app)
 login_manager.login_view = 'auth.login'
 
-
 @login_manager.user_loader
 def load_user(user_id):
     return db_session.get(User, int(user_id))
-
 
 app.register_blueprint(auth)
 app.register_blueprint(admin)
@@ -46,15 +44,13 @@ app.register_blueprint(admin)
 with app.app_context():
     init_db()
 
-
 @app.route('/')
 def index():
-    active_auctions = Auction.query.filter_by(is_active=True).all()
-    inactive_auctions = Auction.query.filter_by(is_active=False).all()
+    active_auctions = Auction.query.filter_by(is_active=True).order_by(Auction.end_time.asc()).all()
+    inactive_auctions = Auction.query.filter_by(is_active=False).order_by(Auction.end_time.desc()).limit(5).all()
     return render_template('index.html',
                            active_auctions=active_auctions,
                            inactive_auctions=inactive_auctions)
-
 
 @app.route('/api/active_auctions', methods=['GET'])
 def get_active_auctions():
@@ -119,18 +115,15 @@ def get_active_auctions():
                 return jsonify({'error': 'Database connection error'}), 500
             time.sleep(2**attempt)
 
-
 @app.route('/watchlist')
 @login_required
 def watchlist():
     return render_template('watchlist.html', auctions=current_user.watchlist)
 
-
 @app.route('/profile')
 @login_required
 def profile():
     return render_template('profile.html')
-
 
 @app.route('/add_to_watchlist/<int:auction_id>', methods=['POST'])
 @login_required
@@ -144,7 +137,6 @@ def add_to_watchlist(auction_id):
         flash('Аукцион уже в избранном или не существует.', 'warning')
     return redirect(url_for('auction_detail', auction_id=auction_id))
 
-
 @app.route('/remove_from_watchlist/<int:auction_id>', methods=['POST'])
 @login_required
 def remove_from_watchlist(auction_id):
@@ -156,7 +148,6 @@ def remove_from_watchlist(auction_id):
     else:
         flash('Аукцион не найден в вашем избранном.', 'warning')
     return redirect(url_for('watchlist'))
-
 
 @app.route('/create_auction', methods=['GET', 'POST'])
 @login_required
@@ -176,7 +167,6 @@ def create_auction():
     return render_template('create_auction.html',
                            title='Создать Аукцион',
                            form=form)
-
 
 @app.route('/auction/<int:auction_id>', methods=['GET', 'POST'])
 def auction_detail(auction_id):
@@ -235,22 +225,18 @@ def auction_detail(auction_id):
                            bids=bids,
                            bid_form=bid_form)
 
-
 @app.errorhandler(404)
 def not_found_error(error):
     return render_template('errors/404.html'), 404
-
 
 @app.errorhandler(500)
 def internal_error(error):
     db_session.rollback()
     return render_template('errors/500.html'), 500
 
-
 @app.teardown_appcontext
 def shutdown_session(exception=None):
     db_session.remove()
-
 
 @app.route('/yoomoney_ipn', methods=['POST'])
 def yoomoney_ipn():
@@ -303,8 +289,6 @@ def yoomoney_ipn():
         logger.error(f"Error processing YooMoney IPN: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
-
-# Функция для закрытия аукционов
 async def close_auctions():
     current_time = datetime.utcnow()
     logger.info(f"Running close_auctions at {current_time}")
@@ -348,8 +332,6 @@ async def close_auctions():
         logger.error(f"Error in close_auctions: {str(e)}")
         db_session.rollback()
 
-
-# Основная асинхронная функция
 async def main():
     bot_application = setup_bot()
     scheduler = AsyncIOScheduler()
@@ -379,7 +361,6 @@ async def main():
         await bot_application.shutdown()
         scheduler.shutdown()
         logging.info("Application shutdown complete")
-
 
 if __name__ == '__main__':
     asyncio.run(main())
