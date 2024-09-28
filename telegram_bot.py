@@ -1,8 +1,9 @@
 import os
 import logging
+import re
 from telegram import Update
 from telegram.ext import (Application, CommandHandler, PreCheckoutQueryHandler,
-                          MessageHandler, filters)
+                          MessageHandler, filters, ConversationHandler, CallbackContext)
 from telegram.error import BadRequest
 from models import User, Auction
 from db import db_session
@@ -24,6 +25,9 @@ Configuration.secret_key = YOOMONEY_SECRET_KEY
 
 application = None  # Global variable for the bot
 
+# Define conversation states
+EMAIL = 1
+
 def validate_yoomoney_config():
     if not all([YOOMONEY_SHOP_ID, YOOMONEY_SECRET_KEY, YOOMONEY_SHOP_ARTICLE_ID]):
         missing_vars = [var for var in ['YOOMONEY_SHOP_ID', 'YOOMONEY_SECRET_KEY', 'YOOMONEY_SHOP_ARTICLE_ID'] if not globals().get(var)]
@@ -42,13 +46,13 @@ async def start(update: Update, context):
         'Welcome to the Auction Platform Bot! Use /buy_stars_yoomoney to purchase XTR stars.'
     )
 
-async def buy_stars_yoomoney(update: Update, context):
+async def buy_stars_yoomoney(update: Update, context: CallbackContext):
     logger.info(f"buy_stars_yoomoney function called by user {update.effective_user.id}")
     try:
         # Step 1: Validate YooMoney configuration
         if not validate_yoomoney_config():
             await update.message.reply_text("Sorry, YooMoney payments are not available at the moment. Please try again later or contact support.")
-            return
+            return ConversationHandler.END
 
         # Step 2: Get or create user
         logger.info("Getting or creating user")
@@ -74,13 +78,37 @@ async def buy_stars_yoomoney(update: Update, context):
             if amount < min_amount:
                 logger.warning(f"User {user_id} attempted to purchase less than the minimum amount")
                 await update.message.reply_text(f"Minimum purchase amount is {min_amount} XTR. Please try again with a larger amount.")
-                return
+                return ConversationHandler.END
         except ValueError:
             logger.warning(f"User {user_id} provided an invalid amount: {amount}")
             await update.message.reply_text("Please provide a valid number of XTR to purchase. For example: /buy_stars_yoomoney 15")
-            return
+            return ConversationHandler.END
 
-        # Step 4: Prepare payment data
+        # Store the amount in the user's context
+        context.user_data['amount'] = amount
+
+        # Step 4: Prompt for email
+        await update.message.reply_text("Please provide your email address for the receipt:")
+        return EMAIL
+
+    except Exception as e:
+        logger.error(f"Unexpected error in buy_stars_yoomoney function: {str(e)}", exc_info=True)
+        error_message = "An unexpected error occurred. Please try again later or contact support."
+        await update.message.reply_text(error_message)
+        return ConversationHandler.END
+
+async def process_email(update: Update, context: CallbackContext):
+    email = update.message.text
+    user_id = update.effective_user.id
+    amount = context.user_data.get('amount')
+
+    # Validate email
+    if not re.match(r"[^@]+@[^@]+\.[^@]+", email):
+        await update.message.reply_text("Invalid email format. Please provide a valid email address.")
+        return EMAIL
+
+    try:
+        # Prepare payment data
         logger.info(f"Preparing payment data for {amount} XTR")
         total_amount = amount * 10  # 1 XTR = 10 RUB
         
@@ -94,16 +122,16 @@ async def buy_stars_yoomoney(update: Update, context):
                 "return_url": f"{os.getenv('BASE_URL', 'https://your-domain.com')}/yoomoney_success"
             },
             "capture": True,
-            "description": f"Purchase of {amount} XTR stars for user {user.id}",
+            "description": f"Purchase of {amount} XTR stars for user {user_id}",
             "metadata": {
-                "user_id": user.id,
+                "user_id": user_id,
                 "amount": amount
             },
             "receipt": {
                 "customer": {
                     "full_name": update.effective_user.full_name,
                     "phone": "",
-                    "email": "user@example.com"  # Add a valid email address here
+                    "email": email
                 },
                 "items": [
                     {
@@ -125,10 +153,11 @@ async def buy_stars_yoomoney(update: Update, context):
             payment_data["merchant_article_id"] = YOOMONEY_SHOP_ARTICLE_ID
 
         logger.info(f"Payment data prepared: {payment_data}")
+        logger.info(f"Email used for payment (masked): {email[:3]}...{email[-3:]}")
 
         try:
             payment = Payment.create(payment_data)
-            logger.info(f"YooMoney payment created for user {user.id}: {payment.id}")
+            logger.info(f"YooMoney payment created for user {user_id}: {payment.id}")
             confirmation_url = payment.confirmation.confirmation_url
             if confirmation_url:
                 success_message = f"Please complete your payment of {amount} XTR ({total_amount} RUB) by clicking the link below:\n{confirmation_url}"
@@ -143,9 +172,11 @@ async def buy_stars_yoomoney(update: Update, context):
             await update.message.reply_text(error_message)
 
     except Exception as e:
-        logger.error(f"Unexpected error in buy_stars_yoomoney function: {str(e)}", exc_info=True)
+        logger.error(f"Unexpected error in process_email function: {str(e)}", exc_info=True)
         error_message = "An unexpected error occurred. Please try again later or contact support."
         await update.message.reply_text(error_message)
+
+    return ConversationHandler.END
 
 async def pre_checkout_callback(update: Update, context):
     query = update.pre_checkout_query
@@ -191,7 +222,17 @@ def setup_bot() -> Application:
 
     logger.info("Adding command handlers")
     application.add_handler(CommandHandler('start', start))
-    application.add_handler(CommandHandler('buy_stars_yoomoney', buy_stars_yoomoney))
+    
+    # Create a conversation handler for the buy_stars_yoomoney command
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler('buy_stars_yoomoney', buy_stars_yoomoney)],
+        states={
+            EMAIL: [MessageHandler(filters.TEXT & ~filters.COMMAND, process_email)]
+        },
+        fallbacks=[CommandHandler('cancel', lambda u, c: ConversationHandler.END)]
+    )
+    application.add_handler(conv_handler)
+    
     application.add_handler(PreCheckoutQueryHandler(pre_checkout_callback))
     application.add_handler(
         MessageHandler(filters.SUCCESSFUL_PAYMENT,
