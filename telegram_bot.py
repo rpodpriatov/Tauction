@@ -1,6 +1,7 @@
 import os
 import logging
 import re
+import time
 from telegram import Update
 from telegram.ext import (
     Application,
@@ -36,6 +37,14 @@ application = None  # Глобальная переменная для бота
 
 # Определение состояний для ConversationHandler
 AWAITING_EMAIL = 1
+
+# Helper function to handle YooMoney API errors
+def handle_yoomoney_error(response):
+    error_data = response.json()
+    logger.error(f"YooMoney API error: {error_data.get('description')} (Code: {error_data.get('code')})")
+    if 'parameter' in error_data:
+        logger.error(f"Error parameter: {error_data['parameter']}")
+    return error_data.get('description')
 
 # Обработчик команды /start
 async def start(update: Update, context):
@@ -174,21 +183,68 @@ async def create_yoomoney_payment(update: Update, context, email):
     logger.info(f"Payment data prepared: {payment_data}")
     logger.info(f"Email used for payment (masked): {email[:3]}...{email[-3:]}")
 
-    try:
-        payment = Payment.create(payment_data)
-        logger.info(f"YooMoney payment created for user {user_id}: {payment.id}")
-        confirmation_url = payment.confirmation.confirmation_url
-        if confirmation_url:
-            success_message = f"Please complete your payment of {amount} XTR ({total_amount} RUB) by clicking the link below:\n{confirmation_url}"
-            await update.message.reply_text(success_message)
-        else:
-            logger.error(f"Failed to create YooMoney payment: {payment.status}")
-            error_message = f"Sorry, there was an error processing your payment. Please try again later or contact support."
-            await update.message.reply_text(error_message)
-    except Exception as api_error:
-        logger.error(f"YooMoney API error: {str(api_error)}")
-        error_message = f"An error occurred while processing your payment: {str(api_error)}. Please try again later or contact support."
-        await update.message.reply_text(error_message)
+    max_retries = 3
+    retry_delay = 1
+
+    for attempt in range(max_retries):
+        try:
+            response = Payment.create(payment_data)
+            
+            if isinstance(response, Payment) and response.status == 'pending':
+                logger.info(f"YooMoney payment created for user {user_id}: {response.id}")
+                confirmation_url = response.confirmation.confirmation_url
+                if confirmation_url:
+                    success_message = f"Please complete your payment of {amount} XTR ({total_amount} RUB) by clicking the link below:\n{confirmation_url}"
+                    await update.message.reply_text(success_message)
+                    return
+                else:
+                    logger.error(f"Failed to create YooMoney payment: {response.status}")
+                    error_message = "Sorry, there was an error processing your payment. Please try again later or contact support."
+                    await update.message.reply_text(error_message)
+                    return
+            else:
+                error_description = handle_yoomoney_error(response)
+                if response.status_code == 400:
+                    logger.error(f"Invalid request: {error_description}")
+                    await update.message.reply_text(f"Invalid request: {error_description}. Please try again or contact support.")
+                elif response.status_code == 401:
+                    logger.error("Authentication failed. Check YooMoney credentials.")
+                    await update.message.reply_text("Payment system authentication error. Please contact support.")
+                elif response.status_code == 403:
+                    logger.error(f"Permission denied: {error_description}")
+                    await update.message.reply_text("Permission denied for this operation. Please contact support.")
+                elif response.status_code == 429:
+                    logger.warning("Too many requests. Implementing exponential backoff.")
+                    if attempt < max_retries - 1:
+                        wait_time = (2 ** attempt) * retry_delay
+                        logger.info(f"Retrying in {wait_time} seconds...")
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        await update.message.reply_text("The payment system is currently overloaded. Please try again later.")
+                elif response.status_code == 500:
+                    logger.error(f"YooMoney server error: {error_description}")
+                    if attempt < max_retries - 1:
+                        wait_time = (attempt + 1) * retry_delay
+                        logger.info(f"Retrying in {wait_time} seconds...")
+                        time.sleep(wait_time)
+                        continue
+                    else:
+                        await update.message.reply_text("The payment system is currently experiencing issues. Please try again later.")
+                else:
+                    logger.error(f"Unexpected error: {error_description}")
+                    await update.message.reply_text(f"An unexpected error occurred: {error_description}. Please try again later or contact support.")
+                return
+
+        except Exception as e:
+            logger.error(f"Exception in create_yoomoney_payment: {str(e)}", exc_info=True)
+            if attempt < max_retries - 1:
+                wait_time = (attempt + 1) * retry_delay
+                logger.info(f"Retrying in {wait_time} seconds...")
+                time.sleep(wait_time)
+            else:
+                await update.message.reply_text("An unexpected error occurred while processing your payment. Please try again later or contact support.")
+                return
 
 # Обработчик предоплаты
 async def pre_checkout_callback(update: Update, context):
