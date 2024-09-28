@@ -1,5 +1,3 @@
-# telegram_bot.py
-
 import os
 import logging
 import requests
@@ -19,6 +17,7 @@ logger = logging.getLogger(__name__)
 # YooMoney API Configuration
 YOOMONEY_SHOP_ID = os.environ.get('YOOMONEY_SHOP_ID')
 YOOMONEY_SECRET_KEY = os.environ.get('YOOMONEY_SECRET_KEY')
+YOOMONEY_SHOP_ARTICLE_ID = os.environ.get('YOOMONEY_SHOP_ARTICLE_ID')
 YOOMONEY_API_URL = 'https://api.yookassa.ru/v3/payments'
 
 application = None  # Глобальная переменная для бота
@@ -64,7 +63,7 @@ async def buy_stars_yoomoney(update: Update, context):
     logger.info(f"buy_stars_yoomoney function called by user {update.effective_user.id}")
     try:
         # Check if all required environment variables are set
-        if not all([YOOMONEY_SHOP_ID, YOOMONEY_SECRET_KEY]):
+        if not all([YOOMONEY_SHOP_ID, YOOMONEY_SECRET_KEY, YOOMONEY_SHOP_ARTICLE_ID]):
             logger.error("YooMoney configuration is incomplete")
             await update.message.reply_text("Sorry, YooMoney payments are not available at the moment. Please try again later or contact support.")
             return
@@ -110,8 +109,33 @@ async def buy_stars_yoomoney(update: Update, context):
             "metadata": {
                 "user_id": user.id,
                 "amount": amount
-            }
+            },
+            "receipt": {
+                "customer": {
+                    "full_name": update.effective_user.full_name,
+                    "phone": "",  # You might want to ask for the user's phone number separately
+                    "email": ""  # You might want to ask for the user's email separately
+                },
+                "items": [
+                    {
+                        "description": "XTR Stars",
+                        "quantity": "1",
+                        "amount": {
+                            "value": f"{total_amount:.2f}",
+                            "currency": "RUB"
+                        },
+                        "vat_code": "1",
+                        "payment_mode": "full_prepayment",
+                        "payment_subject": "service"
+                    }
+                ]
+            },
+            "merchant_customer_id": str(user.id),
+            "save_payment_method": False
         }
+
+        if YOOMONEY_SHOP_ARTICLE_ID:
+            payment["merchant_article_id"] = YOOMONEY_SHOP_ARTICLE_ID
 
         auth = (YOOMONEY_SHOP_ID, YOOMONEY_SECRET_KEY)
         headers = {
@@ -129,6 +153,7 @@ async def buy_stars_yoomoney(update: Update, context):
             response.raise_for_status()  # Raise an exception for non-200 status codes
         except requests.exceptions.RequestException as e:
             logger.error(f"Error in YooMoney API request: {str(e)}")
+            logger.error(f"YooMoney API response: {response.text if response else 'No response'}")
             await update.message.reply_text("There was an error processing your payment request. Please try again later or contact support.")
             return
 
@@ -141,8 +166,11 @@ async def buy_stars_yoomoney(update: Update, context):
             )
         else:
             logger.error(f"Failed to create YooMoney payment: {response.text}")
+            error_code = payment_info.get('code')
+            error_description = payment_info.get('description', 'Unknown error')
+            logger.error(f"YooMoney error: {error_code} - {error_description}")
             await update.message.reply_text(
-                "Sorry, there was an error processing your payment. Please try again later or contact support."
+                f"Sorry, there was an error processing your payment (Error: {error_code}). Please try again later or contact support."
             )
     except Exception as e:
         logger.error(f"Unexpected error in buy_stars_yoomoney function: {str(e)}")
