@@ -55,7 +55,7 @@ agentRequireRestartOnSave = false
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "alembic upgrade head"
+args = "alembic revision --autogenerate -m 'Initial migration' && alembic upgrade head"
 
 [deployment]
 run = ["sh", "-c", "python app.py"]
