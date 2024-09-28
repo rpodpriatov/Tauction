@@ -7,30 +7,13 @@
     <div class="row">
         <div class="col-md-8">
             <h2>Active Auctions</h2>
-            {% if active_auctions %}
-                <div class="row">
-                {% for auction in active_auctions %}
-                    <div class="col-md-6 mb-4">
-                        <div class="card h-100 auction-card">
-                            <div class="card-body">
-                                <h5 class="card-title">{{ auction.title }}</h5>
-                                <p class="card-text">{{ auction.description[:100] }}{% if auction.description|length > 100 %}...{% endif %}</p>
-                                <p class="card-text"><strong>Current Price:</strong> {{ auction.current_price }} XTR</p>
-                                <p class="card-text"><strong>Ends at:</strong> {{ auction.end_time.strftime('%Y-%m-%d %H:%M') }}</p>
-                            </div>
-                            <div class="card-footer">
-                                <a href="{{ url_for('auction_detail', auction_id=auction.id) }}" class="btn btn-primary btn-block w-100">View Details</a>
-                            </div>
-                        </div>
+            <div id="activeAuctions">
+                <div class="text-center" id="loading">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
                     </div>
-                {% endfor %}
                 </div>
-            {% else %}
-                <div class="alert alert-info">
-                    <p class="mb-0">No active auctions at the moment.</p>
-                    <p class="mb-0">Why not <a href="{{ url_for('create_auction') }}" class="alert-link">create one</a>?</p>
-                </div>
-            {% endif %}
+            </div>
         </div>
         
         <div class="col-md-4">
@@ -141,4 +124,63 @@
         border-color: #6c757d;
     }
 </style>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script>
+    function formatDate(dateString) {
+        const options = { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' };
+        return new Date(dateString).toLocaleDateString('en-US', options);
+    }
+
+    function createAuctionCard(auction) {
+        return `
+            <div class="col-md-6 mb-4">
+                <div class="card h-100 auction-card">
+                    <div class="card-body">
+                        <h5 class="card-title">${auction.title}</h5>
+                        <p class="card-text">${auction.description ? auction.description.substring(0, 100) + (auction.description.length > 100 ? '...' : '') : ''}</p>
+                        <p class="card-text"><strong>Current Price:</strong> ${auction.current_price} XTR</p>
+                        <p class="card-text"><strong>Ends at:</strong> ${formatDate(auction.end_time)}</p>
+                    </div>
+                    <div class="card-footer">
+                        <a href="/auction/${auction.id}" class="btn btn-primary btn-block w-100">View Details</a>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function loadActiveAuctions() {
+        axios.get('/api/active_auctions')
+            .then(function (response) {
+                const activeAuctions = response.data;
+                const auctionsContainer = document.getElementById('activeAuctions');
+                auctionsContainer.innerHTML = '';
+
+                if (activeAuctions.length === 0) {
+                    auctionsContainer.innerHTML = `
+                        <div class="alert alert-info">
+                            <p class="mb-0">No active auctions at the moment.</p>
+                            <p class="mb-0">Why not <a href="/create_auction" class="alert-link">create one</a>?</p>
+                        </div>
+                    `;
+                } else {
+                    const row = document.createElement('div');
+                    row.className = 'row';
+                    activeAuctions.forEach(auction => {
+                        row.innerHTML += createAuctionCard(auction);
+                    });
+                    auctionsContainer.appendChild(row);
+                }
+            })
+            .catch(function (error) {
+                console.error('Error loading active auctions:', error);
+                document.getElementById('activeAuctions').innerHTML = '<p class="text-danger">Error loading active auctions. Please try again later.</p>';
+            });
+    }
+
+    document.addEventListener('DOMContentLoaded', loadActiveAuctions);
+</script>
 {% endblock %}

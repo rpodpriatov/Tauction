@@ -129,6 +129,7 @@ def get_active_auctions():
                         auction_data = {
                             'id': auction.id,
                             'title': auction.title,
+                            'description': auction.description,
                             'current_price': auction.current_price,
                             'end_time': end_time
                         }
