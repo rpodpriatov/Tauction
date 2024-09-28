@@ -63,13 +63,16 @@ async def buy_stars(update: Update, context):
 async def buy_stars_yoomoney(update: Update, context):
     logger.info(f"buy_stars_yoomoney function called by user {update.effective_user.id}")
     try:
-        # Check if all required environment variables are set
+        # Step 1: Check if all required environment variables are set
+        logger.info("Checking YooMoney configuration")
         if not all([YOOMONEY_SHOP_ID, YOOMONEY_SECRET_KEY, YOOMONEY_SHOP_ARTICLE_ID]):
             missing_vars = [var for var in ['YOOMONEY_SHOP_ID', 'YOOMONEY_SECRET_KEY', 'YOOMONEY_SHOP_ARTICLE_ID'] if not os.environ.get(var)]
             logger.error(f"YooMoney configuration is incomplete. Missing variables: {', '.join(missing_vars)}")
             await update.message.reply_text("Sorry, YooMoney payments are not available at the moment. Please try again later or contact support.")
             return
 
+        # Step 2: Get or create user
+        logger.info("Getting or creating user")
         user_id = update.effective_user.id
         user = db_session.query(User).filter_by(telegram_id=str(user_id)).first()
         if not user:
@@ -80,8 +83,11 @@ async def buy_stars_yoomoney(update: Update, context):
             db_session.add(user)
             db_session.commit()
             logger.info(f"Created new user: {user.id}")
+        else:
+            logger.info(f"Found existing user: {user.id}")
 
-        # Set a minimum purchase amount (e.g., 10 XTR)
+        # Step 3: Parse and validate amount
+        logger.info("Parsing and validating amount")
         min_amount = 10
         amount = context.args[0] if context.args else str(min_amount)
         try:
@@ -95,8 +101,9 @@ async def buy_stars_yoomoney(update: Update, context):
             await update.message.reply_text("Please provide a valid number of XTR to purchase. For example: /buy_stars_yoomoney 15")
             return
 
+        # Step 4: Prepare payment data
+        logger.info(f"Preparing payment data for {amount} XTR")
         total_amount = amount * 10  # 1 XTR = 10 RUB
-
         payment = {
             "amount": {
                 "value": f"{total_amount:.2f}",
@@ -139,12 +146,15 @@ async def buy_stars_yoomoney(update: Update, context):
         if YOOMONEY_SHOP_ARTICLE_ID:
             payment["merchant_article_id"] = YOOMONEY_SHOP_ARTICLE_ID
 
+        # Step 5: Prepare API request
+        logger.info("Preparing YooMoney API request")
         auth = (YOOMONEY_SHOP_ID, YOOMONEY_SECRET_KEY)
         headers = {
             "Content-Type": "application/json",
             "Idempotence-Key": str(datetime.now().timestamp())
         }
 
+        # Step 6: Send API request
         logger.info(f"Sending payment request to YooMoney for user {user.id}")
         logger.debug(f"YooMoney API request payload: {json.dumps(payment, ensure_ascii=False)}")
         try:
@@ -153,17 +163,18 @@ async def buy_stars_yoomoney(update: Update, context):
                                      headers=headers,
                                      auth=auth,
                                      timeout=10)  # Add a timeout to the request
+            logger.info(f"YooMoney API response status code: {response.status_code}")
+            logger.debug(f"YooMoney API response headers: {json.dumps(dict(response.headers), ensure_ascii=False)}")
             response.raise_for_status()  # Raise an exception for non-200 status codes
         except requests.exceptions.RequestException as e:
             logger.error(f"Error in YooMoney API request: {str(e)}")
             logger.error(f"YooMoney API response: {response.text if response else 'No response'}")
-            if response:
-                logger.error(f"YooMoney API status code: {response.status_code}")
-                logger.error(f"YooMoney API headers: {json.dumps(dict(response.headers), ensure_ascii=False)}")
             error_message = "There was an error processing your payment request. Please try again later or contact support."
             await update.message.reply_text(error_message)
             return
 
+        # Step 7: Process API response
+        logger.info("Processing YooMoney API response")
         payment_info = response.json()
         logger.debug(f"YooMoney API response: {json.dumps(payment_info, ensure_ascii=False)}")
         confirmation_url = payment_info.get('confirmation', {}).get('confirmation_url')
