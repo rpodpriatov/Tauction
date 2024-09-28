@@ -23,13 +23,11 @@ YOOMONEY_API_URL = 'https://api.yookassa.ru/v3/payments'
 
 application = None  # Глобальная переменная для бота
 
-
 async def start(update: Update, context):
     logger.info(f"User {update.effective_user.id} started the bot")
     await update.message.reply_text(
         'Welcome to the Auction Platform Bot! Use /buy_stars to purchase XTR stars.'
     )
-
 
 async def buy_stars(update: Update, context):
     logger.info(
@@ -62,63 +60,70 @@ async def buy_stars(update: Update, context):
             "Sorry, there was an error processing your request. Please try again later."
         )
 
-
 async def buy_stars_yoomoney(update: Update, context):
-    logger.info(
-        f"buy_stars_yoomoney function called by user {update.effective_user.id}"
-    )
+    logger.info(f"buy_stars_yoomoney function called by user {update.effective_user.id}")
     try:
+        # Check if all required environment variables are set
+        if not all([YOOMONEY_SHOP_ID, YOOMONEY_SECRET_KEY]):
+            logger.error("YooMoney configuration is incomplete")
+            await update.message.reply_text("Sorry, YooMoney payments are not available at the moment.")
+            return
+
         user_id = update.effective_user.id
-        user = db_session.query(User).filter_by(
-            telegram_id=str(user_id)).first()
+        user = db_session.query(User).filter_by(telegram_id=str(user_id)).first()
         if not user:
-            # Создаём пользователя, если его ещё нет
             user = User(telegram_id=str(user_id),
                         username=update.effective_user.username,
                         xtr_balance=0)
             db_session.add(user)
             db_session.commit()
+            logger.info(f"Created new user: {user.id}")
 
-        amount = 10  # Количество XTR, которое пользователь хочет купить
-        total_amount = amount * 10  # Примерная цена, можно изменить по необходимости (например, 100 RUB)
+        # Set a minimum purchase amount (e.g., 10 XTR)
+        min_amount = 10
+        amount = context.args[0] if context.args else min_amount
+        try:
+            amount = int(amount)
+            if amount < min_amount:
+                await update.message.reply_text(f"Minimum purchase amount is {min_amount} XTR.")
+                return
+        except ValueError:
+            await update.message.reply_text("Please provide a valid number of XTR to purchase.")
+            return
 
-        # Создание платежа в YooMoney
+        total_amount = amount * 10  # 1 XTR = 10 RUB
+
         payment = {
             "amount": {
-                "value": f"{total_amount}",
+                "value": f"{total_amount:.2f}",
                 "currency": "RUB"
             },
             "confirmation": {
                 "type": "redirect",
-                "return_url":
-                f"{os.getenv('BASE_URL')}/yoomoney_success"  # Замените BASE_URL на ваш домен
+                "return_url": f"{os.getenv('BASE_URL', 'https://your-domain.com')}/yoomoney_success"
             },
             "capture": True,
-            "description":
-            f"Purchase of {amount} XTR stars for user {user.id}",
+            "description": f"Purchase of {amount} XTR stars for user {user.id}",
             "metadata": {
                 "user_id": user.id,
                 "amount": amount
             }
         }
 
-        # Использование HTTP Basic Auth
         auth = (YOOMONEY_SHOP_ID, YOOMONEY_SECRET_KEY)
-
         headers = {"Content-Type": "application/json"}
 
         response = requests.post(YOOMONEY_API_URL,
                                  json=payment,
                                  headers=headers,
                                  auth=auth)
-        if response.status_code == 201:
+        
+        if response.status_code == 200:
             payment_info = response.json()
             confirmation_url = payment_info['confirmation']['confirmation_url']
-            logger.info(
-                f"YooMoney payment created for user {user.id}: {confirmation_url}"
-            )
+            logger.info(f"YooMoney payment created for user {user.id}: {confirmation_url}")
             await update.message.reply_text(
-                f"Please complete your payment by clicking the link below:\n{confirmation_url}"
+                f"Please complete your payment of {amount} XTR ({total_amount} RUB) by clicking the link below:\n{confirmation_url}"
             )
         else:
             logger.error(f"Failed to create YooMoney payment: {response.text}")
@@ -131,14 +136,12 @@ async def buy_stars_yoomoney(update: Update, context):
             "Sorry, there was an error processing your request. Please try again later."
         )
 
-
 async def pre_checkout_callback(update: Update, context):
     query = update.pre_checkout_query
     if query.invoice_payload != "Custom-Payload":
         await query.answer(ok=False, error_message="Something went wrong...")
     else:
         await query.answer(ok=True)
-
 
 async def successful_payment_callback(update: Update, context):
     user_id = update.effective_user.id
@@ -161,7 +164,6 @@ async def successful_payment_callback(update: Update, context):
             f'Thank you for your payment! A new account has been created for you with {amount} XTR stars.'
         )
 
-
 def setup_bot() -> Application:
     global application
     bot_token = os.environ.get('TELEGRAM_BOT_TOKEN')
@@ -179,9 +181,7 @@ def setup_bot() -> Application:
     logger.info("Adding command handlers")
     application.add_handler(CommandHandler('start', start))
     application.add_handler(CommandHandler('buy_stars', buy_stars))
-    application.add_handler(
-        CommandHandler('buy_stars_yoomoney',
-                       buy_stars_yoomoney))  # Новая команда
+    application.add_handler(CommandHandler('buy_stars_yoomoney', buy_stars_yoomoney))
     application.add_handler(PreCheckoutQueryHandler(pre_checkout_callback))
     application.add_handler(
         MessageHandler(filters.SUCCESSFUL_PAYMENT,
@@ -189,7 +189,6 @@ def setup_bot() -> Application:
 
     logger.info("Bot setup completed")
     return application
-
 
 async def send_notification(user_id: int, message: str):
     if application:
