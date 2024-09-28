@@ -15,8 +15,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # YooMoney API Configuration
-YOOMONEY_SHOP_ID = os.environ.get('YOOMONEY_SHOP_ID')
-YOOMONEY_SECRET_KEY = os.environ.get('YOOMONEY_SECRET_KEY')
+YOOMONEY_SHOP_ID = '463032'
+YOOMONEY_SECRET_KEY = 'test_DgU87ik2uVLeLbSPSgO9mDb0La5tcUxqwlXVcQvg-YU'
 YOOMONEY_SHOP_ARTICLE_ID = os.environ.get('YOOMONEY_SHOP_ARTICLE_ID')
 
 Configuration.account_id = YOOMONEY_SHOP_ID
@@ -36,7 +36,7 @@ async def buy_stars_yoomoney(update: Update, context):
         # Step 1: Check if all required environment variables are set
         logger.info("Checking YooMoney configuration")
         if not all([YOOMONEY_SHOP_ID, YOOMONEY_SECRET_KEY, YOOMONEY_SHOP_ARTICLE_ID]):
-            missing_vars = [var for var in ['YOOMONEY_SHOP_ID', 'YOOMONEY_SECRET_KEY', 'YOOMONEY_SHOP_ARTICLE_ID'] if not os.environ.get(var)]
+            missing_vars = [var for var in ['YOOMONEY_SHOP_ID', 'YOOMONEY_SECRET_KEY', 'YOOMONEY_SHOP_ARTICLE_ID'] if not globals().get(var)]
             logger.error(f"YooMoney configuration is incomplete. Missing variables: {', '.join(missing_vars)}")
             await update.message.reply_text("Sorry, YooMoney payments are not available at the moment. Please try again later or contact support.")
             return
