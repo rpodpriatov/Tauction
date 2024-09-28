@@ -1,7 +1,7 @@
 """Add winner_id to auctions
 
 Revision ID: add_winner_id_to_auctions
-Revises: <previous_revision_id>
+Revises: 682e6dcf2a11
 Create Date: 2024-09-28 22:30:00.000000
 
 """
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'add_winner_id_to_auctions'
-down_revision = '<previous_revision_id>'
+down_revision = '682e6dcf2a11'
 branch_labels = None
 depends_on = None
 
