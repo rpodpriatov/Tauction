@@ -134,6 +134,33 @@
         return new Date(dateString).toLocaleDateString('en-US', options);
     }
 
+    function createCountdown(endTime) {
+        const countdownElement = document.createElement('div');
+        countdownElement.className = 'countdown';
+
+        function updateCountdown() {
+            const now = new Date();
+            const timeLeft = new Date(endTime) - now;
+
+            if (timeLeft <= 0) {
+                countdownElement.textContent = 'Auction ended';
+                return;
+            }
+
+            const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+
+            countdownElement.textContent = `${days}d ${hours}h ${minutes}m ${seconds}s`;
+        }
+
+        updateCountdown();
+        setInterval(updateCountdown, 1000);
+
+        return countdownElement;
+    }
+
     function createAuctionCard(auction) {
         return `
             <div class="col-md-6 mb-4">
@@ -143,9 +170,11 @@
                         <p class="card-text">${auction.description ? auction.description.substring(0, 100) + (auction.description.length > 100 ? '...' : '') : ''}</p>
                         <p class="card-text"><strong>Current Price:</strong> ${auction.current_price} XTR</p>
                         <p class="card-text"><strong>Ends at:</strong> ${formatDate(auction.end_time)}</p>
+                        <div class="countdown-container"></div>
                     </div>
-                    <div class="card-footer">
-                        <a href="/auction/${auction.id}" class="btn btn-primary btn-block w-100">View Details</a>
+                    <div class="card-footer d-flex justify-content-between align-items-center">
+                        <a href="/auction/${auction.id}" class="btn btn-primary">View Details</a>
+                        <button class="btn btn-success quick-bid-btn" data-auction-id="${auction.id}">Quick Bid</button>
                     </div>
                 </div>
             </div>
@@ -173,11 +202,37 @@
                         row.innerHTML += createAuctionCard(auction);
                     });
                     auctionsContainer.appendChild(row);
+
+                    // Add countdowns and quick bid functionality
+                    activeAuctions.forEach(auction => {
+                        const countdownContainer = auctionsContainer.querySelector(`[data-auction-id="${auction.id}"]`).closest('.card').querySelector('.countdown-container');
+                        countdownContainer.appendChild(createCountdown(auction.end_time));
+
+                        const quickBidBtn = auctionsContainer.querySelector(`[data-auction-id="${auction.id}"]`);
+                        quickBidBtn.addEventListener('click', () => quickBid(auction.id, auction.current_price));
+                    });
                 }
             })
             .catch(function (error) {
                 console.error('Error loading active auctions:', error);
                 document.getElementById('activeAuctions').innerHTML = '<p class="text-danger">Error loading active auctions. Please try again later.</p>';
+            });
+    }
+
+    function quickBid(auctionId, currentPrice) {
+        const bidAmount = currentPrice + 1; // Increase bid by 1 XTR
+        axios.post(`/auction/${auctionId}/bid`, { amount: bidAmount })
+            .then(function (response) {
+                if (response.data.success) {
+                    alert('Your bid has been placed successfully!');
+                    loadActiveAuctions(); // Reload auctions to show updated price
+                } else {
+                    alert(response.data.message || 'Failed to place bid. Please try again.');
+                }
+            })
+            .catch(function (error) {
+                console.error('Error placing quick bid:', error);
+                alert('An error occurred while placing your bid. Please try again later.');
             });
     }
 

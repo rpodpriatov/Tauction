@@ -261,6 +261,36 @@ def auction_detail(auction_id):
                            bids=bids,
                            bid_form=bid_form)
 
+@app.route('/auction/<int:auction_id>/bid', methods=['POST'])
+@login_required
+def quick_bid(auction_id):
+    auction = db_session.get(Auction, auction_id)
+    if auction is None:
+        return jsonify({'success': False, 'message': 'Auction not found'}), 404
+
+    if not auction.is_active:
+        return jsonify({'success': False, 'message': 'This auction has ended. Bidding is no longer allowed.'}), 400
+
+    bid_amount = request.json.get('amount')
+    if not bid_amount or bid_amount <= auction.current_price:
+        return jsonify({'success': False, 'message': 'Invalid bid amount. It must be higher than the current price.'}), 400
+
+    if current_user.xtr_balance < bid_amount:
+        return jsonify({'success': False, 'message': 'Insufficient XTR balance for this bid.'}), 400
+
+    try:
+        new_bid = Bid(amount=bid_amount, bidder=current_user, auction=auction)
+        db_session.add(new_bid)
+        auction.current_price = bid_amount
+        db_session.commit()
+
+        logger.info(f"New quick bid placed: User {current_user.id} bid {bid_amount} on Auction {auction.id}")
+        return jsonify({'success': True, 'message': 'Your bid has been successfully placed!'}), 200
+    except Exception as e:
+        db_session.rollback()
+        logger.error(f"Error placing quick bid: {e}")
+        return jsonify({'success': False, 'message': 'An error occurred while placing your bid. Please try again later.'}), 500
+
 @app.errorhandler(404)
 def not_found_error(error):
     return render_template('errors/404.html'), 404
