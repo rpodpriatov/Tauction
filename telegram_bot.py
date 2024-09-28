@@ -41,13 +41,31 @@ AWAITING_EMAIL = 1
 def handle_yoomoney_error(response):
     try:
         error_data = response.json()
-        logger.error(f"YooMoney API error: {error_data.get('description')} (Code: {error_data.get('code')})")
-        if 'parameter' in error_data:
-            logger.error(f"Error parameter: {error_data['parameter']}")
-        return error_data.get('description')
+        logger.error(f"YooMoney API error: {error_data}")
+        return error_data.get('description', 'Unknown error')
     except Exception as e:
         logger.error(f"Failed to parse YooMoney API error response: {str(e)}")
         return "Unknown error"
+
+def test_yoomoney_connection():
+    try:
+        payment = Payment.create({
+            "amount": {
+                "value": "1.00",
+                "currency": "RUB"
+            },
+            "confirmation": {
+                "type": "redirect",
+                "return_url": "https://www.example.com/return_url"
+            },
+            "capture": True,
+            "description": "Test payment"
+        })
+        logger.info(f"YooMoney test connection successful. Payment ID: {payment.id}")
+        return True
+    except Exception as e:
+        logger.error(f"YooMoney test connection failed: {str(e)}")
+        return False
 
 async def start(update: Update, context):
     logger.info(f"User {update.effective_user.id} started the bot")
@@ -62,6 +80,11 @@ async def buy_stars_yoomoney(update: Update, context: CallbackContext):
             missing_vars = [var for var in ['YOOMONEY_SHOP_ID', 'YOOMONEY_SECRET_KEY', 'YOOMONEY_SHOP_ARTICLE_ID'] if not os.environ.get(var)]
             logger.error(f"YooMoney configuration is incomplete. Missing variables: {', '.join(missing_vars)}")
             await update.message.reply_text("Sorry, YooMoney payments are not available at the moment. Please try again later or contact support.")
+            return ConversationHandler.END
+
+        if not test_yoomoney_connection():
+            logger.error("YooMoney connection test failed")
+            await update.message.reply_text("Sorry, we're experiencing issues with our payment system. Please try again later or contact support.")
             return ConversationHandler.END
 
         user_id = update.effective_user.id
@@ -199,35 +222,31 @@ async def create_yoomoney_payment(update: Update, context, email):
                     return
             else:
                 error_description = handle_yoomoney_error(response)
+                logger.error(f"YooMoney API error: Status Code: {response.status_code}, Description: {error_description}")
                 if response.status_code == 400:
-                    logger.error(f"Invalid request: {error_description}")
                     await update.message.reply_text(f"Invalid request: {error_description}. Please try again or contact support.")
                 elif response.status_code == 401:
                     logger.error("Authentication failed. Check YooMoney credentials.")
                     await update.message.reply_text("Payment system authentication error. Please contact support.")
                 elif response.status_code == 403:
-                    logger.error(f"Permission denied: {error_description}")
                     await update.message.reply_text("Permission denied for this operation. Please contact support.")
                 elif response.status_code == 429:
-                    logger.warning("Too many requests. Implementing exponential backoff.")
                     if attempt < max_retries - 1:
                         wait_time = (2 ** attempt) * retry_delay
-                        logger.info(f"Retrying in {wait_time} seconds...")
+                        logger.info(f"Too many requests. Retrying in {wait_time} seconds...")
                         time.sleep(wait_time)
                         continue
                     else:
                         await update.message.reply_text("The payment system is currently overloaded. Please try again later.")
                 elif response.status_code == 500:
-                    logger.error(f"YooMoney server error: {error_description}")
                     if attempt < max_retries - 1:
                         wait_time = (attempt + 1) * retry_delay
-                        logger.info(f"Retrying in {wait_time} seconds...")
+                        logger.info(f"YooMoney server error. Retrying in {wait_time} seconds...")
                         time.sleep(wait_time)
                         continue
                     else:
                         await update.message.reply_text("The payment system is currently experiencing issues. Please try again later.")
                 else:
-                    logger.error(f"Unexpected error: {error_description}")
                     await update.message.reply_text(f"An unexpected error occurred: {error_description}. Please try again later or contact support.")
                 return
 
@@ -281,6 +300,12 @@ def setup_bot() -> Application:
     logger.info(f"Setting up bot with token: {bot_token[:5]}...{bot_token[-5:]}")
 
     application = Application.builder().token(bot_token).build()
+
+    logger.info("Testing YooMoney connection")
+    if test_yoomoney_connection():
+        logger.info("YooMoney connection test passed")
+    else:
+        logger.error("YooMoney connection test failed")
 
     logger.info("Adding command handlers")
     
