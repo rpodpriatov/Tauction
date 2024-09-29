@@ -1,5 +1,9 @@
 {% extends "base.html" %}
 
+{% block breadcrumb %}
+    <li class="breadcrumb-item active" aria-current="page">Home</li>
+{% endblock %}
+
 {% block content %}
 <h1 class="mb-4 fade-in">Welcome to the Auction Platform</h1>
 
@@ -8,15 +12,21 @@
     <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 masonry-grid">
     {% for auction in active_auctions %}
         <div class="col">
-            <div class="card h-100 fade-in">
+            <div class="card h-100 fade-in" data-auction-id="{{ auction.id }}">
                 <div class="card-body">
                     <h5 class="card-title">{{ auction.title }}</h5>
                     <p class="card-text">{{ auction.description | truncate(100) }}</p>
-                    <p class="card-text"><strong>Current Price:</strong> {{ auction.current_price }} XTR</p>
-                    <p class="card-text"><strong>Ends at:</strong> {{ auction.end_time.strftime('%Y-%m-%d %H:%M') }}</p>
+                    <p class="card-text"><strong>Current Price:</strong> <span class="current-price">{{ auction.current_price }}</span> XTR</p>
+                    <p class="card-text"><strong>Ends at:</strong> <span class="end-time" data-end-time="{{ auction.end_time.isoformat() }}">{{ auction.end_time.strftime('%Y-%m-%d %H:%M') }}</span></p>
                 </div>
                 <div class="card-footer bg-transparent border-top-0">
                     <a href="{{ url_for('auction_detail', auction_id=auction.id) }}" class="btn btn-primary btn-block">View Details</a>
+                    {% if current_user.is_authenticated %}
+                        <button class="btn btn-outline-secondary btn-sm mt-2 watchlist-btn" data-auction-id="{{ auction.id }}" data-action="{% if auction in current_user.watchlist %}remove{% else %}add{% endif %}">
+                            <i class="{% if auction in current_user.watchlist %}fas{% else %}far{% endif %} fa-star"></i>
+                            {% if auction in current_user.watchlist %}Remove from{% else %}Add to{% endif %} Watchlist
+                        </button>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -62,6 +72,36 @@
                 percentPosition: true
             });
         });
+
+        // Initialize tooltips
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl)
+        });
+
+        // Update countdown timers
+        function updateCountdowns() {
+            document.querySelectorAll('.end-time').forEach(function(element) {
+                var endTime = new Date(element.dataset.endTime);
+                var now = new Date();
+                var timeLeft = endTime - now;
+
+                if (timeLeft > 0) {
+                    var days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+                    var hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                    var minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                    var seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+
+                    element.textContent = `${days}d ${hours}h ${minutes}m ${seconds}s`;
+                } else {
+                    element.textContent = "Auction ended";
+                    element.closest('.card').classList.add('inactive');
+                }
+            });
+        }
+
+        updateCountdowns();
+        setInterval(updateCountdowns, 1000);
     });
 </script>
 {% endblock %}

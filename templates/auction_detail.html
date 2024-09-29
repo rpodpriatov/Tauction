@@ -1,96 +1,191 @@
 {% extends "base.html" %}
 
+{% block breadcrumb %}
+    <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Auctions</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ auction.title }}</li>
+{% endblock %}
+
 {% block content %}
 <div class="row">
     <div class="col-md-8">
-        <h1 class="mb-4">{{ auction.title }}</h1>
-        <div class="card mb-4">
+        <h1 class="mb-4 fade-in">{{ auction.title }}</h1>
+        <div class="card mb-4 fade-in">
             <div class="card-body">
                 <p class="card-text">{{ auction.description }}</p>
-                <p class="card-text"><strong>Current Price:</strong> {{ auction.current_price }} XTR</p>
-                <p class="card-text"><strong>Time Remaining:</strong> <span id="countdown"></span></p>
+                <p class="card-text"><strong>Current Price:</strong> <span id="current-price">{{ auction.current_price }}</span> XTR</p>
+                <p class="card-text"><strong>Time Remaining:</strong> <span id="countdown" data-end-time="{{ auction.end_time.isoformat() }}"></span></p>
                 <p class="card-text"><strong>Creator:</strong> {{ auction.creator.username }}</p>
                 
                 {% if current_user.is_authenticated %}
-                    {% if auction in current_user.watchlist %}
-                        <form action="{{ url_for('remove_from_watchlist', auction_id=auction.id) }}" method="post" class="d-inline">
-                            <button type="submit" class="btn btn-danger"><i class="fas fa-star"></i> Remove from Watchlist</button>
-                        </form>
-                    {% else %}
-                        <form action="{{ url_for('add_to_watchlist', auction_id=auction.id) }}" method="post" class="d-inline">
-                            <button type="submit" class="btn btn-primary"><i class="far fa-star"></i> Add to Watchlist</button>
-                        </form>
-                    {% endif %}
+                    <button class="btn btn-outline-secondary btn-sm mt-2 watchlist-btn" data-auction-id="{{ auction.id }}" data-action="{% if auction in current_user.watchlist %}remove{% else %}add{% endif %}">
+                        <i class="{% if auction in current_user.watchlist %}fas{% else %}far{% endif %} fa-star"></i>
+                        {% if auction in current_user.watchlist %}Remove from{% else %}Add to{% endif %} Watchlist
+                    </button>
                 {% endif %}
             </div>
         </div>
 
         {% if auction.is_active and current_user.is_authenticated %}
-            <div class="card mb-4">
-                <div class="card-body">
-                    <h3 class="card-title">Place a Bid</h3>
-                    <form method="POST" action="{{ url_for('auction_detail', auction_id=auction.id) }}">
-                        {{ bid_form.hidden_tag() }}
-                        <div class="mb-3">
-                            {{ bid_form.amount.label(class="form-label") }}
-                            {{ bid_form.amount(class="form-control", placeholder="Enter your bid amount") }}
-                            {% for error in bid_form.amount.errors %}
-                                <span class="text-danger">{{ error }}</span>
-                            {% endfor %}
-                        </div>
-                        <div class="mb-3">
-                            {{ bid_form.submit(class="btn btn-success") }}
-                        </div>
-                    </form>
-                </div>
-            </div>
+            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#bidModal">
+                Place a Bid
+            </button>
         {% elif not current_user.is_authenticated %}
             <p class="alert alert-warning">Please <a href="{{ url_for('auth.login') }}">login</a> to place a bid.</p>
         {% endif %}
     </div>
 
     <div class="col-md-4">
-        <h3 class="mb-3">Bid History</h3>
-        {% if bids %}
-            <ul class="list-group">
-                {% for bid in bids %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <div>
-                            <strong>{{ bid.bidder.username }}</strong> bid
-                            <strong>{{ bid.amount }} XTR</strong>
-                        </div>
-                        <small class="text-muted">{{ bid.timestamp.strftime('%Y-%m-%d %H:%M') }}</small>
-                    </li>
-                {% endfor %}
-            </ul>
-        {% else %}
-            <p class="alert alert-info">No bids yet.</p>
-        {% endif %}
+        <h3 class="mb-3 fade-in">Bid History</h3>
+        <div id="bid-history">
+            {% if bids %}
+                <ul class="list-group">
+                    {% for bid in bids %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center fade-in">
+                            <div>
+                                <strong>{{ bid.bidder.username }}</strong> bid
+                                <strong>{{ bid.amount }} XTR</strong>
+                            </div>
+                            <small class="text-muted">{{ bid.timestamp.strftime('%Y-%m-%d %H:%M') }}</small>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="alert alert-info fade-in">No bids yet.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Bidding Modal -->
+<div class="modal fade" id="bidModal" tabindex="-1" aria-labelledby="bidModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="bidModalLabel">Place a Bid</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="bid-form" method="POST" action="{{ url_for('auction_detail', auction_id=auction.id) }}">
+                    {{ bid_form.hidden_tag() }}
+                    <div class="mb-3">
+                        {{ bid_form.amount.label(class="form-label") }}
+                        {{ bid_form.amount(class="form-control", placeholder="Enter your bid amount") }}
+                        <div id="bidHelp" class="form-text">Your bid must be higher than the current price of {{ auction.current_price }} XTR.</div>
+                        {% for error in bid_form.amount.errors %}
+                            <span class="text-danger">{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                    <div class="mb-3">
+                        <button type="submit" class="btn btn-primary" id="submit-bid">Place Bid</button>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast Notification -->
+<div class="position-fixed bottom-0 end-0 p-3" style="z-index: 11">
+    <div id="liveToast" class="toast hide" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast-header">
+            <strong class="me-auto">Notification</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body">
+            <!-- Toast message will be inserted here -->
+        </div>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    // Countdown timer
-    function updateCountdown() {
-        const now = new Date().getTime();
-        const endTime = new Date("{{ auction.end_time }}").getTime();
-        const timeLeft = endTime - now;
+    document.addEventListener('DOMContentLoaded', function() {
+        const countdownElement = document.getElementById('countdown');
+        const currentPriceElement = document.getElementById('current-price');
+        const bidForm = document.getElementById('bid-form');
+        const submitBidButton = document.getElementById('submit-bid');
+        const bidHistoryElement = document.getElementById('bid-history');
+        const toastElement = document.getElementById('liveToast');
+        const toast = new bootstrap.Toast(toastElement);
 
-        if (timeLeft > 0) {
-            const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
-            const hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-            const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-            const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+        function updateCountdown() {
+            const now = new Date().getTime();
+            const endTime = new Date(countdownElement.dataset.endTime).getTime();
+            const timeLeft = endTime - now;
 
-            document.getElementById("countdown").innerHTML = `${days}d ${hours}h ${minutes}m ${seconds}s`;
-        } else {
-            document.getElementById("countdown").innerHTML = "Auction has ended";
+            if (timeLeft > 0) {
+                const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+
+                countdownElement.textContent = `${days}d ${hours}h ${minutes}m ${seconds}s`;
+            } else {
+                countdownElement.textContent = "Auction ended";
+                submitBidButton.disabled = true;
+            }
         }
-    }
 
-    updateCountdown();
-    setInterval(updateCountdown, 1000);
+        updateCountdown();
+        setInterval(updateCountdown, 1000);
+
+        // Real-time bid updates
+        function updateBids() {
+            fetch(`/api/auction/${auction.id}/bids`)
+                .then(response => response.json())
+                .then(data => {
+                    currentPriceElement.textContent = data.current_price;
+                    bidHistoryElement.innerHTML = data.bid_history_html;
+                })
+                .catch(error => console.error('Error:', error));
+        }
+
+        setInterval(updateBids, 5000);
+
+        // Handle bid form submission
+        bidForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const formData = new FormData(bidForm);
+            
+            fetch(bidForm.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    currentPriceElement.textContent = data.new_price;
+                    bidHistoryElement.innerHTML = data.bid_history_html;
+                    showToast('Success', 'Your bid has been placed successfully!', 'success');
+                } else {
+                    showToast('Error', data.error, 'danger');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('Error', 'An error occurred while placing your bid. Please try again.', 'danger');
+            });
+        });
+
+        function showToast(title, message, type) {
+            const toastElement = document.getElementById('liveToast');
+            toastElement.querySelector('.me-auto').textContent = title;
+            toastElement.querySelector('.toast-body').textContent = message;
+            toastElement.className = `toast hide bg-${type} text-white`;
+            const toast = new bootstrap.Toast(toastElement);
+            toast.show();
+        }
+
+        // Initialize tooltips
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl)
+        });
+    });
 </script>
 {% endblock %}

@@ -171,3 +171,41 @@ const animateOnScroll = () => {
 };
 
 document.addEventListener('DOMContentLoaded', animateOnScroll);
+
+// Implement dark mode toggle
+const darkModeToggle = document.getElementById('dark-mode-toggle');
+if (darkModeToggle) {
+    darkModeToggle.addEventListener('click', () => {
+        document.body.classList.toggle('dark-mode');
+        localStorage.setItem('dark-mode', document.body.classList.contains('dark-mode'));
+    });
+
+    // Check for saved dark mode preference
+    if (localStorage.getItem('dark-mode') === 'true') {
+        document.body.classList.add('dark-mode');
+    }
+}
+
+// Implement responsive navigation menu
+const navbarToggler = document.querySelector('.navbar-toggler');
+const navbarCollapse = document.querySelector('.navbar-collapse');
+
+if (navbarToggler && navbarCollapse) {
+    navbarToggler.addEventListener('click', () => {
+        navbarCollapse.classList.toggle('show');
+    });
+}
+
+// Implement search functionality
+const searchForm = document.getElementById('search-form');
+const searchInput = document.getElementById('search-input');
+
+if (searchForm && searchInput) {
+    searchForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const searchTerm = searchInput.value.trim();
+        if (searchTerm) {
+            window.location.href = `/search?q=${encodeURIComponent(searchTerm)}`;
+        }
+    });
+}
