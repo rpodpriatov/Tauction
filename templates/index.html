@@ -2,240 +2,40 @@
 
 {% block content %}
 <div class="container mt-5">
-    <h1 class="mb-4">Welcome to the Auction Platform</h1>
+    <h1>Welcome to the Auction Platform</h1>
     
-    <div class="row">
-        <div class="col-md-8">
-            <h2>Active Auctions</h2>
-            <div id="activeAuctions">
-                <div class="text-center" id="loading">
-                    <div class="spinner-border text-primary" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-4">
-            <div class="card mb-4 quick-links-card">
-                <div class="card-header bg-primary text-white">
-                    <h3 class="mb-0">Quick Links</h3>
-                </div>
-                <div class="card-body">
-                    <a href="{{ url_for('create_auction') }}" class="btn btn-success btn-lg w-100 mb-3">Create New Auction</a>
-                    <div class="list-group">
-                        <a href="{{ url_for('watchlist') }}" class="list-group-item list-group-item-action">My Watchlist</a>
-                        <a href="{{ url_for('profile') }}" class="list-group-item list-group-item-action">My Profile</a>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="card ended-auctions-card">
-                <div class="card-header bg-secondary text-white">
-                    <h3 class="mb-0">Recently Ended Auctions</h3>
-                </div>
-                <div class="card-body">
-                    {% if inactive_auctions %}
-                        <ul class="list-group list-group-flush">
-                        {% for auction in inactive_auctions %}
-                            <li class="list-group-item">
-                                <h6>{{ auction.title }}</h6>
-                                <p class="mb-1"><strong>Final Price:</strong> {{ auction.current_price }} XTR</p>
-                                <small class="text-muted">Ended: {{ auction.end_time.strftime('%Y-%m-%d %H:%M') }}</small>
-                            </li>
-                        {% endfor %}
-                        </ul>
-                    {% else %}
-                        <p class="mb-0">No recently ended auctions.</p>
-                    {% endif %}
-                    
-                    <nav aria-label="Ended auctions pagination" class="mt-3">
-                        <ul class="pagination justify-content-center">
-                            <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
-                                <a class="page-link" href="{{ url_for('index', page=pagination.prev_num) if pagination.has_prev else '#' }}">Previous</a>
-                            </li>
+    <h2>Active Auctions</h2>
+    {% if active_auctions %}
+        <ul class="list-group">
+        {% for auction in active_auctions %}
+            <li class="list-group-item">
+                <h3>{{ auction.title }}</h3>
+                <p>{{ auction.description }}</p>
+                <p>Current Price: {{ auction.current_price }} XTR</p>
+                <p>Ends at: {{ auction.end_time }}</p>
+                <a href="{{ url_for('auction_detail', auction_id=auction.id) }}" class="btn btn-primary">View Details</a>
+            </li>
+        {% endfor %}
+        </ul>
+    {% else %}
+        <p>No active auctions at the moment.</p>
+    {% endif %}
 
-                            <li class="page-item active">
-                                <span class="page-link">
-                                    Page {{ pagination.page }} of {{ pagination.pages or 1 }}
-                                </span>
-                            </li>
-
-                            <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
-                                <a class="page-link" href="{{ url_for('index', page=pagination.next_num) if pagination.has_next else '#' }}">Next</a>
-                            </li>
-                        </ul>
-                    </nav>
-                </div>
-            </div>
-        </div>
-    </div>
+    <h2>Inactive Auctions</h2>
+    {% if inactive_auctions %}
+        <ul class="list-group">
+        {% for auction in inactive_auctions %}
+            <li class="list-group-item">
+                <h3>{{ auction.title }}</h3>
+                <p>{{ auction.description }}</p>
+                <p>Final Price: {{ auction.current_price }} XTR</p>
+                <p>Ended at: {{ auction.end_time }}</p>
+                <a href="{{ url_for('auction_detail', auction_id=auction.id) }}" class="btn btn-secondary">View Details</a>
+            </li>
+        {% endfor %}
+        </ul>
+    {% else %}
+        <p>No inactive auctions to display.</p>
+    {% endif %}
 </div>
-{% endblock %}
-
-{% block styles %}
-<style>
-    body {
-        background-color: #f8f9fa;
-    }
-    .card {
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        border: none;
-        margin-bottom: 20px;
-    }
-    .card-header {
-        border-bottom: none;
-    }
-    .btn-block {
-        display: block;
-        width: 100%;
-    }
-    .list-group-item {
-        border-left: none;
-        border-right: none;
-    }
-    .list-group-item:first-child {
-        border-top: none;
-    }
-    .list-group-item:last-child {
-        border-bottom: none;
-    }
-    .auction-card {
-        transition: transform 0.2s;
-    }
-    .auction-card:hover {
-        transform: translateY(-5px);
-    }
-    .quick-links-card {
-        background-color: #e9ecef;
-    }
-    .ended-auctions-card {
-        background-color: #f1f3f5;
-    }
-    .pagination {
-        margin-bottom: 0;
-    }
-    .page-link {
-        color: #6c757d;
-        border-color: #6c757d;
-    }
-    .page-item.active .page-link {
-        background-color: #6c757d;
-        border-color: #6c757d;
-    }
-</style>
-{% endblock %}
-
-{% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script>
-    function formatDate(dateString) {
-        const options = { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' };
-        return new Date(dateString).toLocaleDateString('en-US', options);
-    }
-
-    function createCountdown(endTime) {
-        const countdownElement = document.createElement('div');
-        countdownElement.className = 'countdown';
-
-        function updateCountdown() {
-            const now = new Date();
-            const timeLeft = new Date(endTime) - now;
-
-            if (timeLeft <= 0) {
-                countdownElement.textContent = 'Auction ended';
-                return;
-            }
-
-            const days = Math.floor(timeLeft / (1000 * 60 * 60 * 24));
-            const hours = Math.floor((timeLeft % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-            const minutes = Math.floor((timeLeft % (1000 * 60 * 60)) / (1000 * 60));
-            const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
-
-            countdownElement.textContent = `${days}d ${hours}h ${minutes}m ${seconds}s`;
-        }
-
-        updateCountdown();
-        setInterval(updateCountdown, 1000);
-
-        return countdownElement;
-    }
-
-    function createAuctionCard(auction) {
-        return `
-            <div class="col-md-6 mb-4">
-                <div class="card h-100 auction-card">
-                    <div class="card-body">
-                        <h5 class="card-title">${auction.title}</h5>
-                        <p class="card-text">${auction.description ? auction.description.substring(0, 100) + (auction.description.length > 100 ? '...' : '') : ''}</p>
-                        <p class="card-text"><strong>Current Price:</strong> ${auction.current_price} XTR</p>
-                        <p class="card-text"><strong>Ends at:</strong> ${formatDate(auction.end_time)}</p>
-                        <div class="countdown-container"></div>
-                    </div>
-                    <div class="card-footer d-flex justify-content-between align-items-center">
-                        <a href="/auction/${auction.id}" class="btn btn-primary">View Details</a>
-                        <button class="btn btn-success quick-bid-btn" data-auction-id="${auction.id}">Quick Bid</button>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
-
-    function loadActiveAuctions() {
-        axios.get('/api/active_auctions')
-            .then(function (response) {
-                const activeAuctions = response.data;
-                const auctionsContainer = document.getElementById('activeAuctions');
-                auctionsContainer.innerHTML = '';
-
-                if (activeAuctions.length === 0) {
-                    auctionsContainer.innerHTML = `
-                        <div class="alert alert-info">
-                            <p class="mb-0">No active auctions at the moment.</p>
-                            <p class="mb-0">Why not <a href="/create_auction" class="alert-link">create one</a>?</p>
-                        </div>
-                    `;
-                } else {
-                    const row = document.createElement('div');
-                    row.className = 'row';
-                    activeAuctions.forEach(auction => {
-                        row.innerHTML += createAuctionCard(auction);
-                    });
-                    auctionsContainer.appendChild(row);
-
-                    // Add countdowns and quick bid functionality
-                    activeAuctions.forEach(auction => {
-                        const countdownContainer = auctionsContainer.querySelector(`[data-auction-id="${auction.id}"]`).closest('.card').querySelector('.countdown-container');
-                        countdownContainer.appendChild(createCountdown(auction.end_time));
-
-                        const quickBidBtn = auctionsContainer.querySelector(`[data-auction-id="${auction.id}"]`);
-                        quickBidBtn.addEventListener('click', () => quickBid(auction.id, auction.current_price));
-                    });
-                }
-            })
-            .catch(function (error) {
-                console.error('Error loading active auctions:', error);
-                document.getElementById('activeAuctions').innerHTML = '<p class="text-danger">Error loading active auctions. Please try again later.</p>';
-            });
-    }
-
-    function quickBid(auctionId, currentPrice) {
-        const bidAmount = currentPrice + 1; // Increase bid by 1 XTR
-        axios.post(`/auction/${auctionId}/bid`, { amount: bidAmount })
-            .then(function (response) {
-                if (response.data.success) {
-                    alert('Your bid has been placed successfully!');
-                    loadActiveAuctions(); // Reload auctions to show updated price
-                } else {
-                    alert(response.data.message || 'Failed to place bid. Please try again.');
-                }
-            })
-            .catch(function (error) {
-                console.error('Error placing quick bid:', error);
-                alert('An error occurred while placing your bid. Please try again later.');
-            });
-    }
-
-    document.addEventListener('DOMContentLoaded', loadActiveAuctions);
-</script>
 {% endblock %}

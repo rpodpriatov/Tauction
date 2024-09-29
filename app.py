@@ -1,7 +1,8 @@
+# app.py
+
 import os
 import logging
 import time
-import signal
 from flask import Flask, render_template, redirect, url_for, jsonify, request, flash, abort
 from flask_login import LoginManager, login_required, current_user
 from config import Config
@@ -20,7 +21,6 @@ from sqlalchemy.orm import sessionmaker
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import hmac
 import hashlib
-from sqlalchemy import desc
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -34,12 +34,11 @@ logger = logging.getLogger(__name__)
 login_manager = LoginManager(app)
 login_manager.login_view = 'auth.login'
 
-bot_application = None
-scheduler = None
 
 @login_manager.user_loader
 def load_user(user_id):
     return db_session.get(User, int(user_id))
+
 
 app.register_blueprint(auth)
 app.register_blueprint(admin)
@@ -47,47 +46,15 @@ app.register_blueprint(admin)
 with app.app_context():
     init_db()
 
+
 @app.route('/')
 def index():
-    page = request.args.get('page', 1, type=int)
-    per_page = 5
-    active_auctions = Auction.query.filter_by(is_active=True).order_by(Auction.end_time.asc()).all()
-    
-    total_inactive = Auction.query.filter_by(is_active=False).count()
-    inactive_auctions = Auction.query.filter_by(is_active=False).order_by(desc(Auction.end_time)).offset((page-1)*per_page).limit(per_page).all()
-    
-    class Pagination:
-        def __init__(self, page, per_page, total_count):
-            self.page = page
-            self.per_page = per_page
-            self.total_count = total_count
-
-        @property
-        def pages(self):
-            return int((self.total_count + self.per_page - 1) / self.per_page)
-
-        @property
-        def has_prev(self):
-            return self.page > 1
-
-        @property
-        def has_next(self):
-            return self.page < self.pages
-
-        @property
-        def prev_num(self):
-            return self.page - 1 if self.has_prev else None
-
-        @property
-        def next_num(self):
-            return self.page + 1 if self.has_next else None
-
-    pagination = Pagination(page, per_page, total_inactive)
-
+    active_auctions = Auction.query.filter_by(is_active=True).all()
+    inactive_auctions = Auction.query.filter_by(is_active=False).all()
     return render_template('index.html',
                            active_auctions=active_auctions,
-                           inactive_auctions=inactive_auctions,
-                           pagination=pagination)
+                           inactive_auctions=inactive_auctions)
+
 
 @app.route('/api/active_auctions', methods=['GET'])
 def get_active_auctions():
@@ -131,7 +98,6 @@ def get_active_auctions():
                         auction_data = {
                             'id': auction.id,
                             'title': auction.title,
-                            'description': auction.description,
                             'current_price': auction.current_price,
                             'end_time': end_time
                         }
@@ -153,15 +119,18 @@ def get_active_auctions():
                 return jsonify({'error': 'Database connection error'}), 500
             time.sleep(2**attempt)
 
+
 @app.route('/watchlist')
 @login_required
 def watchlist():
     return render_template('watchlist.html', auctions=current_user.watchlist)
 
+
 @app.route('/profile')
 @login_required
 def profile():
     return render_template('profile.html')
+
 
 @app.route('/add_to_watchlist/<int:auction_id>', methods=['POST'])
 @login_required
@@ -175,6 +144,7 @@ def add_to_watchlist(auction_id):
         flash('Аукцион уже в избранном или не существует.', 'warning')
     return redirect(url_for('auction_detail', auction_id=auction_id))
 
+
 @app.route('/remove_from_watchlist/<int:auction_id>', methods=['POST'])
 @login_required
 def remove_from_watchlist(auction_id):
@@ -186,6 +156,7 @@ def remove_from_watchlist(auction_id):
     else:
         flash('Аукцион не найден в вашем избранном.', 'warning')
     return redirect(url_for('watchlist'))
+
 
 @app.route('/create_auction', methods=['GET', 'POST'])
 @login_required
@@ -205,6 +176,7 @@ def create_auction():
     return render_template('create_auction.html',
                            title='Создать Аукцион',
                            form=form)
+
 
 @app.route('/auction/<int:auction_id>', methods=['GET', 'POST'])
 def auction_detail(auction_id):
@@ -263,48 +235,22 @@ def auction_detail(auction_id):
                            bids=bids,
                            bid_form=bid_form)
 
-@app.route('/auction/<int:auction_id>/bid', methods=['POST'])
-@login_required
-def quick_bid(auction_id):
-    auction = db_session.get(Auction, auction_id)
-    if auction is None:
-        return jsonify({'success': False, 'message': 'Auction not found'}), 404
-
-    if not auction.is_active:
-        return jsonify({'success': False, 'message': 'This auction has ended. Bidding is no longer allowed.'}), 400
-
-    bid_amount = request.json.get('amount')
-    if not bid_amount or bid_amount <= auction.current_price:
-        return jsonify({'success': False, 'message': 'Invalid bid amount. It must be higher than the current price.'}), 400
-
-    if current_user.xtr_balance < bid_amount:
-        return jsonify({'success': False, 'message': 'Insufficient XTR balance for this bid.'}), 400
-
-    try:
-        new_bid = Bid(amount=bid_amount, bidder=current_user, auction=auction)
-        db_session.add(new_bid)
-        auction.current_price = bid_amount
-        db_session.commit()
-
-        logger.info(f"New quick bid placed: User {current_user.id} bid {bid_amount} on Auction {auction.id}")
-        return jsonify({'success': True, 'message': 'Your bid has been successfully placed!'}), 200
-    except Exception as e:
-        db_session.rollback()
-        logger.error(f"Error placing quick bid: {e}")
-        return jsonify({'success': False, 'message': 'An error occurred while placing your bid. Please try again later.'}), 500
 
 @app.errorhandler(404)
 def not_found_error(error):
     return render_template('errors/404.html'), 404
+
 
 @app.errorhandler(500)
 def internal_error(error):
     db_session.rollback()
     return render_template('errors/500.html'), 500
 
+
 @app.teardown_appcontext
 def shutdown_session(exception=None):
     db_session.remove()
+
 
 @app.route('/yoomoney_ipn', methods=['POST'])
 def yoomoney_ipn():
@@ -357,6 +303,8 @@ def yoomoney_ipn():
         logger.error(f"Error processing YooMoney IPN: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
+
+# Функция для закрытия аукционов
 async def close_auctions():
     current_time = datetime.utcnow()
     logger.info(f"Running close_auctions at {current_time}")
@@ -400,48 +348,9 @@ async def close_auctions():
         logger.error(f"Error in close_auctions: {str(e)}")
         db_session.rollback()
 
-async def shutdown(signal, loop):
-    logging.info(f"Received exit signal {signal.name}...")
-    
-    logging.info("Stopping web application...")
-    await app.shutdown()
-    
-    if bot_application:
-        logging.info("Stopping Telegram bot...")
-        await bot_application.shutdown()
-    
-    if scheduler:
-        logging.info("Stopping scheduler...")
-        scheduler.shutdown(wait=False)
-    
-    logging.info("Closing database connections...")
-    db_session.remove()
-    
-    tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
-    [task.cancel() for task in tasks]
-    logging.info(f"Cancelling {len(tasks)} outstanding tasks")
-    await asyncio.gather(*tasks, return_exceptions=True)
-    
-    logging.info("Stopping event loop...")
-    loop.stop()
 
-def handle_exception(loop, context):
-    msg = context.get("exception", context["message"])
-    logging.error(f"Caught exception: {msg}")
-    logging.info("Shutting down...")
-    asyncio.create_task(shutdown(signal.SIGTERM, loop))
-
+# Основная асинхронная функция
 async def main():
-    global bot_application, scheduler
-    
-    loop = asyncio.get_running_loop()
-    signals = (signal.SIGHUP, signal.SIGTERM, signal.SIGINT)
-    for s in signals:
-        loop.add_signal_handler(
-            s, lambda s=s: asyncio.create_task(shutdown(s, loop)))
-    
-    loop.set_exception_handler(handle_exception)
-    
     bot_application = setup_bot()
     scheduler = AsyncIOScheduler()
     scheduler.add_job(close_auctions, 'interval', minutes=1)
@@ -467,7 +376,10 @@ async def main():
     except Exception as e:
         logging.error(f"Error in main function: {e}")
     finally:
-        await shutdown(signal.SIGTERM, loop)
+        await bot_application.shutdown()
+        scheduler.shutdown()
+        logging.info("Application shutdown complete")
+
 
 if __name__ == '__main__':
     asyncio.run(main())
