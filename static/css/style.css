@@ -1,37 +1,41 @@
 :root {
-    --primary-color: #3498db;
-    --secondary-color: #2ecc71;
-    --accent-color: #e74c3c;
+    --primary-color: #4a90e2;
+    --secondary-color: #50c878;
+    --accent-color: #ff6b6b;
     --background-color: #f8f9fa;
     --text-color: #333;
     --card-background: #fff;
+    --transition-speed: 0.3s;
 }
 
 body {
-    font-family: 'Open Sans', sans-serif;
+    font-family: 'Poppins', sans-serif;
     background-color: var(--background-color);
     color: var(--text-color);
     line-height: 1.6;
-    transition: background-color 0.3s ease, color 0.3s ease;
+    transition: background-color var(--transition-speed) ease, color var(--transition-speed) ease;
 }
 
 h1, h2, h3, h4, h5, h6 {
-    font-family: 'Roboto', sans-serif;
-    font-weight: 700;
+    font-weight: 600;
 }
 
 .navbar {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: background-color var(--transition-speed) ease;
+    padding: 1rem 0;
 }
 
 .navbar-brand {
-    font-weight: bold;
+    font-weight: 700;
     color: var(--primary-color) !important;
+    font-size: 1.5rem;
 }
 
 .nav-link {
     color: var(--text-color) !important;
-    transition: color 0.3s ease;
+    transition: color var(--transition-speed) ease;
+    font-weight: 500;
 }
 
 .nav-link:hover {
@@ -41,19 +45,24 @@ h1, h2, h3, h4, h5, h6 {
 .btn-primary {
     background-color: var(--primary-color);
     border-color: var(--primary-color);
+    transition: background-color var(--transition-speed) ease, transform var(--transition-speed) ease;
+    padding: 0.5rem 1rem;
+    font-weight: 600;
 }
 
 .btn-primary:hover {
     background-color: darken(var(--primary-color), 10%);
     border-color: darken(var(--primary-color), 10%);
+    transform: translateY(-2px);
 }
 
 .card {
-    transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+    transition: transform var(--transition-speed) ease-in-out, box-shadow var(--transition-speed) ease-in-out;
     border: none;
     border-radius: 10px;
     overflow: hidden;
     background-color: var(--card-background);
+    margin-bottom: 1.5rem;
 }
 
 .card:hover {
@@ -64,18 +73,21 @@ h1, h2, h3, h4, h5, h6 {
 .footer {
     background-color: var(--background-color);
     color: var(--text-color);
+    transition: background-color var(--transition-speed) ease;
+    padding: 2rem 0;
+    margin-top: 3rem;
 }
 
 .footer a {
     color: var(--primary-color);
-    transition: color 0.3s ease;
+    transition: color var(--transition-speed) ease;
 }
 
 .footer a:hover {
     color: darken(var(--primary-color), 10%);
+    text-decoration: none;
 }
 
-/* Dark mode styles */
 body.dark-mode {
     --background-color: #1a1a1a;
     --text-color: #f0f0f0;
@@ -96,7 +108,6 @@ body.dark-mode {
     color: var(--text-color);
 }
 
-/* Animations */
 @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
@@ -106,7 +117,39 @@ body.dark-mode {
     animation: fadeIn 0.5s ease-in;
 }
 
-/* Responsive adjustments */
+.hero {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 6rem 0;
+    margin-bottom: 3rem;
+    text-align: center;
+}
+
+.hero h1 {
+    font-size: 3.5rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+}
+
+.hero p {
+    font-size: 1.2rem;
+    margin-bottom: 2rem;
+}
+
+.auction-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 1.5rem;
+}
+
+.auction-item {
+    transition: transform var(--transition-speed) ease;
+}
+
+.auction-item:hover {
+    transform: scale(1.03);
+}
+
 @media (max-width: 768px) {
     .navbar-nav {
         margin-top: 1rem;
@@ -115,9 +158,16 @@ body.dark-mode {
     .navbar-nav .nav-item {
         margin-bottom: 0.5rem;
     }
+
+    .hero h1 {
+        font-size: 2.5rem;
+    }
+
+    .hero {
+        padding: 4rem 0;
+    }
 }
 
-/* Accessibility improvements */
 .sr-only {
     position: absolute;
     width: 1px;
@@ -133,4 +183,71 @@ body.dark-mode {
 a:focus, button:focus, input:focus, select:focus, textarea:focus {
     outline: 2px solid var(--primary-color);
     outline-offset: 2px;
+}
+
+.countdown {
+    font-size: 1.2rem;
+    font-weight: 600;
+    color: var(--accent-color);
+}
+
+.bid-history {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.bid-history-item {
+    padding: 0.5rem;
+    border-bottom: 1px solid #eee;
+    transition: background-color var(--transition-speed) ease;
+}
+
+.bid-history-item:hover {
+    background-color: rgba(0, 0, 0, 0.05);
+}
+
+.dark-mode .bid-history-item:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+/* New styles for improved UI/UX */
+.form-control {
+    border-radius: 5px;
+    border: 1px solid #ced4da;
+    padding: 0.5rem 0.75rem;
+}
+
+.form-control:focus {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 0.2rem rgba(74, 144, 226, 0.25);
+}
+
+.btn {
+    border-radius: 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.alert {
+    border-radius: 5px;
+    border: none;
+}
+
+.toast {
+    border-radius: 5px;
+}
+
+.modal-content {
+    border-radius: 10px;
+    border: none;
+}
+
+.modal-header {
+    border-bottom: none;
+    padding: 1.5rem;
+}
+
+.modal-footer {
+    border-top: none;
+    padding: 1.5rem;
 }

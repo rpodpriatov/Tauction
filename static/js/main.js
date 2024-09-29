@@ -104,4 +104,32 @@ document.addEventListener('DOMContentLoaded', function() {
             percentPosition: true
         });
     }
+
+    // Add smooth transition when scrolling
+    window.addEventListener('scroll', function() {
+        const navbar = document.querySelector('.navbar');
+        if (window.scrollY > 50) {
+            navbar.classList.add('navbar-scrolled');
+        } else {
+            navbar.classList.remove('navbar-scrolled');
+        }
+    });
+
+    // Add animation to hero section
+    const hero = document.querySelector('.hero');
+    if (hero) {
+        hero.classList.add('animate__animated', 'animate__fadeIn');
+    }
+
+    // Initialize custom form validation
+    const forms = document.querySelectorAll('.needs-validation');
+    Array.prototype.slice.call(forms).forEach(function (form) {
+        form.addEventListener('submit', function (event) {
+            if (!form.checkValidity()) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+            form.classList.add('was-validated');
+        }, false);
+    });
 });

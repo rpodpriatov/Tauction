@@ -1,87 +1,88 @@
 {% extends "base.html" %}
 
-{% block breadcrumb %}
-    <li class="breadcrumb-item active" aria-current="page">Home</li>
-{% endblock %}
-
 {% block content %}
-<h1 class="mb-4 fade-in">Welcome to the Auction Platform</h1>
+<section class="hero text-center">
+    <div class="container">
+        <h1 class="mb-4 fade-in">Welcome to the Auction Platform</h1>
+        <p class="lead mb-4 fade-in">Discover unique items and bid on exciting auctions!</p>
+        {% if current_user.is_authenticated %}
+            <a href="{{ url_for('create_auction') }}" class="btn btn-light btn-lg fade-in">Create Auction</a>
+        {% else %}
+            <a href="{{ url_for('auth.login') }}" class="btn btn-light btn-lg fade-in">Join Now</a>
+        {% endif %}
+    </div>
+</section>
 
-<h2 class="mb-3 fade-in">Active Auctions</h2>
-{% if active_auctions %}
-    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 masonry-grid">
-    {% for auction in active_auctions %}
-        <div class="col">
-            <div class="card h-100 fade-in" data-auction-id="{{ auction.id }}">
-                <div class="card-body">
-                    <h5 class="card-title">{{ auction.title }}</h5>
-                    <p class="card-text">{{ auction.description | truncate(100) }}</p>
-                    <p class="card-text"><strong>Current Price:</strong> <span class="current-price">{{ auction.current_price }}</span> XTR</p>
-                    <p class="card-text"><strong>Ends at:</strong> <span class="end-time" data-end-time="{{ auction.end_time.isoformat() }}">{{ auction.end_time.strftime('%Y-%m-%d %H:%M') }}</span></p>
-                </div>
-                <div class="card-footer bg-transparent border-top-0">
-                    <a href="{{ url_for('auction_detail', auction_id=auction.id) }}" class="btn btn-primary btn-block">View Details</a>
-                    {% if current_user.is_authenticated %}
-                        <button class="btn btn-outline-secondary btn-sm mt-2 watchlist-btn" data-auction-id="{{ auction.id }}" data-action="{% if auction in current_user.watchlist %}remove{% else %}add{% endif %}">
-                            <i class="{% if auction in current_user.watchlist %}fas{% else %}far{% endif %} fa-star"></i>
-                            {% if auction in current_user.watchlist %}Remove from{% else %}Add to{% endif %} Watchlist
-                        </button>
-                    {% endif %}
+<div class="container">
+    <h2 class="mb-4 fade-in">Active Auctions</h2>
+    {% if active_auctions %}
+        <div class="auction-grid">
+        {% for auction in active_auctions %}
+            <div class="auction-item fade-in">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ auction.title }}</h5>
+                        <p class="card-text">{{ auction.description | truncate(100) }}</p>
+                        <p class="card-text"><strong>Current Price:</strong> <span class="text-primary">{{ auction.current_price }} XTR</span></p>
+                        <p class="card-text"><strong>Ends in:</strong> <span class="countdown" data-end-time="{{ auction.end_time.isoformat() }}"></span></p>
+                    </div>
+                    <div class="card-footer bg-transparent border-top-0">
+                        <a href="{{ url_for('auction_detail', auction_id=auction.id) }}" class="btn btn-primary btn-sm">View Details</a>
+                        {% if current_user.is_authenticated %}
+                            <button class="btn btn-outline-secondary btn-sm mt-2 watchlist-btn" data-auction-id="{{ auction.id }}" data-action="{% if auction in current_user.watchlist %}remove{% else %}add{% endif %}">
+                                <i class="{% if auction in current_user.watchlist %}fas{% else %}far{% endif %} fa-star"></i>
+                                {% if auction in current_user.watchlist %}Remove from{% else %}Add to{% endif %} Watchlist
+                            </button>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
+        {% endfor %}
         </div>
-    {% endfor %}
-    </div>
-{% else %}
-    <p class="alert alert-info fade-in">No active auctions at the moment.</p>
-{% endif %}
+    {% else %}
+        <p class="alert alert-info fade-in">No active auctions at the moment.</p>
+    {% endif %}
 
-<h2 class="mt-5 mb-3 fade-in">Inactive Auctions</h2>
-{% if inactive_auctions %}
-    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4 masonry-grid">
-    {% for auction in inactive_auctions %}
-        <div class="col">
-            <div class="card h-100 fade-in">
-                <div class="card-body">
-                    <h5 class="card-title">{{ auction.title }}</h5>
-                    <p class="card-text">{{ auction.description | truncate(100) }}</p>
-                    <p class="card-text"><strong>Final Price:</strong> {{ auction.current_price }} XTR</p>
-                    <p class="card-text"><strong>Ended at:</strong> {{ auction.end_time.strftime('%Y-%m-%d %H:%M') }}</p>
-                </div>
-                <div class="card-footer bg-transparent border-top-0">
-                    <a href="{{ url_for('auction_detail', auction_id=auction.id) }}" class="btn btn-secondary btn-block">View Details</a>
+    <h2 class="mt-5 mb-4 fade-in">Ended Auctions</h2>
+    {% if inactive_auctions %}
+        <div class="auction-grid">
+        {% for auction in inactive_auctions %}
+            <div class="auction-item fade-in">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ auction.title }}</h5>
+                        <p class="card-text">{{ auction.description | truncate(100) }}</p>
+                        <p class="card-text"><strong>Final Price:</strong> <span class="text-primary">{{ auction.current_price }} XTR</span></p>
+                        <p class="card-text"><strong>Ended at:</strong> {{ auction.end_time.strftime('%Y-%m-%d %H:%M') }}</p>
+                    </div>
+                    <div class="card-footer bg-transparent border-top-0">
+                        <a href="{{ url_for('auction_detail', auction_id=auction.id) }}" class="btn btn-secondary btn-sm">View Details</a>
+                    </div>
                 </div>
             </div>
+        {% endfor %}
         </div>
-    {% endfor %}
-    </div>
-{% else %}
-    <p class="alert alert-info fade-in">No inactive auctions to display.</p>
-{% endif %}
+    {% else %}
+        <p class="alert alert-info fade-in">No ended auctions to display.</p>
+    {% endif %}
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script src="https://unpkg.com/masonry-layout@4/dist/masonry.pkgd.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        var grids = document.querySelectorAll('.masonry-grid');
-        grids.forEach(function(grid) {
-            new Masonry(grid, {
-                itemSelector: '.col',
-                columnWidth: '.col',
-                percentPosition: true
-            });
-        });
-
-        // Initialize tooltips
-        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
-        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
-            return new bootstrap.Tooltip(tooltipTriggerEl)
+        // Initialize Masonry layout
+        var grid = document.querySelector('.auction-grid');
+        var masonry = new Masonry(grid, {
+            itemSelector: '.auction-item',
+            columnWidth: '.auction-item',
+            percentPosition: true
         });
 
         // Update countdown timers
         function updateCountdowns() {
-            document.querySelectorAll('.end-time').forEach(function(element) {
+            document.querySelectorAll('.countdown').forEach(function(element) {
                 var endTime = new Date(element.dataset.endTime);
                 var now = new Date();
                 var timeLeft = endTime - now;
@@ -95,13 +96,49 @@
                     element.textContent = `${days}d ${hours}h ${minutes}m ${seconds}s`;
                 } else {
                     element.textContent = "Auction ended";
-                    element.closest('.card').classList.add('inactive');
+                    element.closest('.card').classList.add('auction-ended');
                 }
             });
         }
 
         updateCountdowns();
         setInterval(updateCountdowns, 1000);
+
+        // Watchlist functionality
+        document.querySelectorAll('.watchlist-btn').forEach(function(button) {
+            button.addEventListener('click', function() {
+                var auctionId = this.dataset.auctionId;
+                var action = this.dataset.action;
+                var url = action === 'add' ? `/add_to_watchlist/${auctionId}` : `/remove_from_watchlist/${auctionId}`;
+
+                fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token() }}'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        this.innerHTML = action === 'add' ? '<i class="fas fa-star"></i> Remove from Watchlist' : '<i class="far fa-star"></i> Add to Watchlist';
+                        this.dataset.action = action === 'add' ? 'remove' : 'add';
+                        showNotification(data.message, 'success');
+                    } else {
+                        showNotification(data.message, 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showNotification('An error occurred. Please try again.', 'error');
+                });
+            });
+        });
+
+        function showNotification(message, type) {
+            // Implement a notification system (e.g., toast notifications)
+            console.log(`${type}: ${message}`);
+        }
     });
 </script>
 {% endblock %}
