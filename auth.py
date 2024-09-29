@@ -19,10 +19,10 @@ def logout():
     logout_user()
     return redirect(url_for('index'))
 
-@auth.route('/auth/telegram')
+@auth.route('/auth/telegram', methods=['GET', 'POST'])
 def telegram_auth():
     # Verify the data received from Telegram
-    data = request.args
+    data = request.args if request.method == 'GET' else request.form
     if not data:
         return 'Authentication failed: No data received', 400
 

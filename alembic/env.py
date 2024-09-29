@@ -27,9 +27,8 @@ target_metadata = Base.metadata
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
 
-
 def run_migrations_offline() -> None:
-    url = os.getenv('DATABASE_URL')
+    url = os.environ.get('DATABASE_URL')
     context.configure(
         url=url,
         target_metadata=Base.metadata,
@@ -40,10 +39,9 @@ def run_migrations_offline() -> None:
     with context.begin_transaction():
         context.run_migrations()
 
-
 def run_migrations_online() -> None:
     configuration = config.get_section(config.config_ini_section)
-    configuration['sqlalchemy.url'] = os.getenv('DATABASE_URL')
+    configuration['sqlalchemy.url'] = os.environ.get('DATABASE_URL')
     connectable = engine_from_config(
         configuration,
         prefix="sqlalchemy.",
@@ -58,7 +56,6 @@ def run_migrations_online() -> None:
 
         with context.begin_transaction():
             context.run_migrations()
-
 
 if context.is_offline_mode():
     run_migrations_offline()
