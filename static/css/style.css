@@ -1,18 +1,32 @@
 body {
-    font-family: 'Arial', sans-serif;
+    font-family: 'Roboto', sans-serif;
     background-color: #f8f9fa;
 }
 
-.navbar {
+.custom-navbar {
+    background-color: #333333;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .navbar-brand {
     font-weight: bold;
+    font-size: 24px;
 }
 
 .nav-link {
+    font-size: 18px;
     font-weight: 500;
+    padding: 15px 20px !important;
+    transition: all 0.3s ease;
+}
+
+.nav-link:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    text-decoration: underline;
+}
+
+.navbar-nav .nav-item {
+    margin-left: 10px;
 }
 
 .card {
@@ -60,6 +74,40 @@ body {
 .footer {
     background-color: #f8f9fa;
     border-top: 1px solid #dee2e6;
+}
+
+@media (max-width: 991px) {
+    .navbar-collapse {
+        background-color: #333333;
+        padding: 15px;
+        border-radius: 0 0 5px 5px;
+    }
+
+    .navbar-nav {
+        align-items: flex-start;
+    }
+
+    .nav-link {
+        padding: 10px 15px !important;
+    }
+
+    .navbar-toggler {
+        border: none;
+        padding: 0.25rem 0.75rem;
+    }
+
+    .navbar-toggler:focus {
+        box-shadow: none;
+    }
+
+    .navbar-toggler-icon {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba%28255, 255, 255, 0.85%29' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
+    }
+
+    .navbar-collapse.collapsing,
+    .navbar-collapse.show {
+        transition: all 0.35s ease;
+    }
 }
 
 @media (max-width: 768px) {
