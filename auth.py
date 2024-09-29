@@ -1,54 +1,64 @@
-import os
-from flask import Blueprint, request, redirect, url_for, flash, render_template, session
+from flask import Blueprint, request, render_template, redirect, url_for
+from flask_login import login_user, logout_user, login_required, current_user
 from models import User
+from sqlalchemy import select
 from db import db_session
-import hashlib
 import hmac
-from datetime import datetime, timedelta
+import hashlib
+from config import Config
+import logging
 
 auth = Blueprint('auth', __name__)
+
+logger = logging.getLogger(__name__)
+
 
 @auth.route('/login')
 def login():
     return render_template('login.html')
 
-@auth.route('/logout')
-def logout():
-    session.pop('user_id', None)
-    return redirect(url_for('index'))
 
-@auth.route('/auth/telegram', methods=['GET', 'POST'])
+@auth.route('/auth/telegram', methods=['GET'])
 def telegram_auth():
-    # Verify the data received from Telegram
-    data = request.args if request.method == 'GET' else request.form
-    if not data:
-        return 'Authentication failed: No data received', 400
+    auth_data = request.args.to_dict()
+    if not validate_telegram_auth(auth_data):
+        return render_template('login.html',
+                               error="Invalid Telegram authentication")
 
-    received_hash = data.get('hash')
-    auth_date = data.get('auth_date')
+    user_id = auth_data['id']
+    username = auth_data.get('username') or f"user_{user_id}"
 
-    # Check if the auth_date is not older than 1 day
-    if int(auth_date) < (datetime.now() - timedelta(days=1)).timestamp():
-        return 'Authentication failed: Data is outdated', 400
-
-    # Remove the hash from the data for comparison
-    data_check_string = '\n'.join(f'{k}={v}' for k, v in sorted(data.items()) if k != 'hash')
-
-    # Create a secret key by hashing the bot token
-    secret_key = hashlib.sha256(os.environ['TELEGRAM_BOT_TOKEN'].encode('utf-8')).digest()
-
-    # Generate a hash of the data for comparison
-    generated_hash = hmac.new(secret_key, data_check_string.encode('utf-8'), hashlib.sha256).hexdigest()
-
-    if received_hash != generated_hash:
-        return 'Authentication failed: Data is not authentic', 400
-
-    # If the data is authentic, proceed with user login or registration
-    user = User.query.filter_by(telegram_id=data.get('id')).first()
+    user = db_session.query(User).filter(User.telegram_id == user_id).first()
     if not user:
-        user = User(telegram_id=data.get('id'), username=data.get('username'))
+        user = User(telegram_id=user_id, username=username, is_active=True)
         db_session.add(user)
         db_session.commit()
+    login_user(user)
 
-    session['user_id'] = user.id
     return redirect(url_for('index'))
+
+
+@auth.route('/logout')
+@login_required
+def logout():
+    if current_user.is_authenticated:
+        user_id = current_user.id
+        logout_user()
+        logger.info(f"User logged out: {user_id}")
+    else:
+        logger.info("Logout attempted for already logged out user")
+    return redirect(url_for('index'))
+
+
+def validate_telegram_auth(auth_data):
+    bot_token = Config.TELEGRAM_BOT_TOKEN
+    if not bot_token:
+        logger.error("TELEGRAM_BOT_TOKEN not set")
+        return False
+
+    secret_key = hashlib.sha256(bot_token.encode()).digest()
+    sorted_data = sorted((k, v) for k, v in auth_data.items() if k != 'hash')
+    data_check_string = "\n".join(f"{k}={v}" for k, v in sorted_data)
+    hash_digest = hmac.new(secret_key, data_check_string.encode(),
+                           hashlib.sha256).hexdigest()
+    return hmac.compare_digest(hash_digest, auth_data['hash'])

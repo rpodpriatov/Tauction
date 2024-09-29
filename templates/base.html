@@ -18,7 +18,8 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item"><a class="nav-link" href="{{ url_for('index') }}">Home</a></li>
-                    {% if session.get('user_id') %}
+                    {% if current_user.is_authenticated %}
+                        <li class="nav-item"><a class="nav-link" href="{{ url_for('profile') }}">Profile</a></li>
                         <li class="nav-item"><a class="nav-link" href="{{ url_for('create_auction') }}">Create Auction</a></li>
                         <li class="nav-item"><a class="nav-link" href="{{ url_for('watchlist') }}">Watchlist</a></li>
                         <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.logout') }}">Logout</a></li>
