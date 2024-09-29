@@ -15,6 +15,28 @@ document.querySelectorAll('a[href^="#"]').forEach(anchor => {
     });
 });
 
+// Lazy loading for images
+document.addEventListener("DOMContentLoaded", function() {
+    var lazyImages = [].slice.call(document.querySelectorAll("img.lazy"));
+
+    if ("IntersectionObserver" in window) {
+        let lazyImageObserver = new IntersectionObserver(function(entries, observer) {
+            entries.forEach(function(entry) {
+                if (entry.isIntersecting) {
+                    let lazyImage = entry.target;
+                    lazyImage.src = lazyImage.dataset.src;
+                    lazyImage.classList.remove("lazy");
+                    lazyImageObserver.unobserve(lazyImage);
+                }
+            });
+        });
+
+        lazyImages.forEach(function(lazyImage) {
+            lazyImageObserver.observe(lazyImage);
+        });
+    }
+});
+
 // Add fade-in effect to cards
 function fadeInCards() {
     const cards = document.querySelectorAll('.card');
@@ -30,7 +52,7 @@ window.addEventListener('load', fadeInCards);
 
 // Implement infinite scrolling for auction listings
 let page = 1;
-const auctionList = document.querySelector('.auction-list');
+const auctionList = document.querySelector('.masonry-grid');
 const loadMoreButton = document.getElementById('load-more');
 
 if (loadMoreButton) {
@@ -47,6 +69,11 @@ function loadMoreAuctions() {
                     const auctionCard = createAuctionCard(auction);
                     auctionList.appendChild(auctionCard);
                 });
+                new Masonry(auctionList, {
+                    itemSelector: '.col',
+                    columnWidth: '.col',
+                    percentPosition: true
+                });
                 fadeInCards();
             } else {
                 loadMoreButton.style.display = 'none';
@@ -56,8 +83,10 @@ function loadMoreAuctions() {
 }
 
 function createAuctionCard(auction) {
+    const col = document.createElement('div');
+    col.className = 'col';
     const card = document.createElement('div');
-    card.className = 'card auction-card';
+    card.className = 'card h-100';
     card.innerHTML = `
         <div class="card-body">
             <h5 class="card-title">${auction.title}</h5>
@@ -65,11 +94,12 @@ function createAuctionCard(auction) {
             <p class="card-text"><strong>Current Price:</strong> ${auction.current_price} XTR</p>
             <p class="card-text"><strong>Ends at:</strong> ${new Date(auction.end_time).toLocaleString()}</p>
         </div>
-        <div class="card-footer">
-            <a href="/auction/${auction.id}" class="btn btn-primary">View Details</a>
+        <div class="card-footer bg-transparent border-top-0">
+            <a href="/auction/${auction.id}" class="btn btn-primary btn-block">View Details</a>
         </div>
     `;
-    return card;
+    col.appendChild(card);
+    return col;
 }
 
 // Add to watchlist functionality
@@ -123,3 +153,21 @@ function showNotification(message, type) {
         notification.remove();
     }, 5000);
 }
+
+// Add animations to elements when they come into view
+const animateOnScroll = () => {
+    const elements = document.querySelectorAll('.animate-on-scroll');
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('animated');
+            }
+        });
+    });
+
+    elements.forEach((element) => {
+        observer.observe(element);
+    });
+};
+
+document.addEventListener('DOMContentLoaded', animateOnScroll);
