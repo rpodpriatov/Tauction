@@ -1,6 +1,5 @@
 import os
-from flask import Blueprint, request, redirect, url_for, flash, render_template
-from flask_login import login_user, logout_user, login_required, current_user
+from flask import Blueprint, request, redirect, url_for, flash, render_template, session
 from models import User
 from db import db_session
 import hashlib
@@ -14,9 +13,8 @@ def login():
     return render_template('login.html')
 
 @auth.route('/logout')
-@login_required
 def logout():
-    logout_user()
+    session.pop('user_id', None)
     return redirect(url_for('index'))
 
 @auth.route('/auth/telegram', methods=['GET', 'POST'])
@@ -52,5 +50,5 @@ def telegram_auth():
         db_session.add(user)
         db_session.commit()
 
-    login_user(user)
+    session['user_id'] = user.id
     return redirect(url_for('index'))

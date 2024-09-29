@@ -1,7 +1,6 @@
 import os
 import logging
-from flask import Flask, render_template, redirect, url_for, jsonify, request, flash, abort
-from flask_login import LoginManager, login_required, current_user
+from flask import Flask, render_template, redirect, url_for, jsonify, request, flash, abort, session
 from config import Config
 from models import User, Auction, Subscriber, Bid
 from auth import auth
@@ -18,19 +17,10 @@ app = Flask(__name__)
 app.config.from_object(Config)
 
 logging.basicConfig(
-    filename='app.py',
+    filename='app.log',
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
-login_manager = LoginManager(app)
-login_manager.login_view = 'auth.login'
-
-bot_application = None
-
-@login_manager.user_loader
-def load_user(user_id):
-    return db_session.get(User, int(user_id))
 
 app.register_blueprint(auth)
 app.register_blueprint(admin)
@@ -46,5 +36,5 @@ def index():
 # ... [rest of the existing routes]
 
 if __name__ == '__main__':
-    bot_application = setup_bot()  # Remove the 'app' argument
+    bot_application = setup_bot()
     app.run(host='0.0.0.0', port=5000, debug=True)
