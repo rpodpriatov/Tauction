@@ -39,7 +39,14 @@
                             <a class="nav-link" href="{{ url_for('auth.login') }}"><i class="fas fa-sign-in-alt"></i> Login</a>
                         </li>
                     {% endif %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="#" id="dark-mode-toggle"><i class="fas fa-moon"></i> Dark Mode</a>
+                    </li>
                 </ul>
+                <form class="d-flex ms-2" id="search-form">
+                    <input class="form-control me-2" type="search" placeholder="Search" aria-label="Search" id="search-input">
+                    <button class="btn btn-outline-light" type="submit">Search</button>
+                </form>
             </div>
         </div>
     </nav>
@@ -73,7 +80,14 @@
                         <a class="nav-link" href="{{ url_for('auth.login') }}"><i class="fas fa-sign-in-alt"></i> Login</a>
                     </li>
                 {% endif %}
+                <li class="nav-item">
+                    <a class="nav-link" href="#" id="dark-mode-toggle-mobile"><i class="fas fa-moon"></i> Dark Mode</a>
+                </li>
             </ul>
+            <form class="mt-3" id="search-form-mobile">
+                <input class="form-control mb-2" type="search" placeholder="Search" aria-label="Search" id="search-input-mobile">
+                <button class="btn btn-outline-primary w-100" type="submit">Search</button>
+            </form>
         </div>
     </div>
 

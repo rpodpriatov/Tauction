@@ -174,16 +174,24 @@ document.addEventListener('DOMContentLoaded', animateOnScroll);
 
 // Implement dark mode toggle
 const darkModeToggle = document.getElementById('dark-mode-toggle');
-if (darkModeToggle) {
-    darkModeToggle.addEventListener('click', () => {
-        document.body.classList.toggle('dark-mode');
-        localStorage.setItem('dark-mode', document.body.classList.contains('dark-mode'));
-    });
+const darkModeToggleMobile = document.getElementById('dark-mode-toggle-mobile');
 
-    // Check for saved dark mode preference
-    if (localStorage.getItem('dark-mode') === 'true') {
-        document.body.classList.add('dark-mode');
-    }
+function toggleDarkMode() {
+    document.body.classList.toggle('dark-mode');
+    localStorage.setItem('dark-mode', document.body.classList.contains('dark-mode'));
+}
+
+if (darkModeToggle) {
+    darkModeToggle.addEventListener('click', toggleDarkMode);
+}
+
+if (darkModeToggleMobile) {
+    darkModeToggleMobile.addEventListener('click', toggleDarkMode);
+}
+
+// Check for saved dark mode preference
+if (localStorage.getItem('dark-mode') === 'true') {
+    document.body.classList.add('dark-mode');
 }
 
 // Implement responsive navigation menu
@@ -199,13 +207,33 @@ if (navbarToggler && navbarCollapse) {
 // Implement search functionality
 const searchForm = document.getElementById('search-form');
 const searchInput = document.getElementById('search-input');
+const searchFormMobile = document.getElementById('search-form-mobile');
+const searchInputMobile = document.getElementById('search-input-mobile');
+
+function handleSearch(e) {
+    e.preventDefault();
+    const searchTerm = this.querySelector('input[type="search"]').value.trim();
+    if (searchTerm) {
+        window.location.href = `/search?q=${encodeURIComponent(searchTerm)}`;
+    }
+}
 
 if (searchForm && searchInput) {
-    searchForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const searchTerm = searchInput.value.trim();
-        if (searchTerm) {
-            window.location.href = `/search?q=${encodeURIComponent(searchTerm)}`;
-        }
-    });
+    searchForm.addEventListener('submit', handleSearch);
 }
+
+if (searchFormMobile && searchInputMobile) {
+    searchFormMobile.addEventListener('submit', handleSearch);
+}
+
+// Initialize Masonry layout
+document.addEventListener('DOMContentLoaded', function() {
+    const grid = document.querySelector('.masonry-grid');
+    if (grid) {
+        new Masonry(grid, {
+            itemSelector: '.col',
+            columnWidth: '.col',
+            percentPosition: true
+        });
+    }
+});
