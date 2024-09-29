@@ -45,7 +45,7 @@
                 </div>
             </div>
         {% elif not current_user.is_authenticated %}
-            <p>Please <a href="{{ url_for('auth.login') }}">login</a> to place a bid.</p>
+            <p class="alert alert-warning">Please <a href="{{ url_for('auth.login') }}">login</a> to place a bid.</p>
         {% endif %}
     </div>
 
@@ -64,7 +64,7 @@
                 {% endfor %}
             </ul>
         {% else %}
-            <p>No bids yet.</p>
+            <p class="alert alert-info">No bids yet.</p>
         {% endif %}
     </div>
 </div>
