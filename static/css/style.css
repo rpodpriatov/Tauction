@@ -1,83 +1,69 @@
 body {
-    font-family: Arial, sans-serif;
-    line-height: 1.6;
-    margin: 0;
-    padding: 0;
+    font-family: 'Arial', sans-serif;
+    background-color: #f8f9fa;
 }
 
-header {
-    background-color: #333;
-    color: #fff;
-    padding: 1rem;
+.navbar {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-nav ul {
-    list-style-type: none;
-    padding: 0;
+.navbar-brand {
+    font-weight: bold;
 }
 
-nav ul li {
-    display: inline;
-    margin-right: 1rem;
+.nav-link {
+    font-weight: 500;
 }
 
-nav ul li a {
-    color: #fff;
-    text-decoration: none;
-}
-
-main {
-    padding: 2rem;
-}
-
-footer {
-    background-color: #333;
-    color: #fff;
-    text-align: center;
-    padding: 1rem;
-    position: fixed;
-    bottom: 0;
-    width: 100%;
-}
-
-form div {
-    margin-bottom: 1rem;
-}
-
-label {
-    display: block;
-    margin-bottom: 0.5rem;
-}
-
-input[type="text"],
-input[type="number"],
-textarea {
-    width: 100%;
-    padding: 0.5rem;
-}
-
-input[type="submit"] {
-    background-color: #333;
-    color: #fff;
-    padding: 0.5rem 1rem;
+.card {
     border: none;
-    cursor: pointer;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
 }
 
-table {
-    width: 100%;
-    border-collapse: collapse;
+.card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
 }
 
-table, th, td {
-    border: 1px solid #ddd;
+.btn-primary {
+    background-color: #007bff;
+    border-color: #007bff;
 }
 
-th, td {
-    padding: 0.5rem;
-    text-align: left;
+.btn-primary:hover {
+    background-color: #0056b3;
+    border-color: #0056b3;
 }
 
-th {
-    background-color: #f2f2f2;
+.auction-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.auction-card {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.auction-card .card-body {
+    flex-grow: 1;
+}
+
+.auction-card .card-footer {
+    background-color: transparent;
+    border-top: none;
+}
+
+.footer {
+    background-color: #f8f9fa;
+    border-top: 1px solid #dee2e6;
+}
+
+@media (max-width: 768px) {
+    .auction-list {
+        grid-template-columns: 1fr;
+    }
 }

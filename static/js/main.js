@@ -1,15 +1,125 @@
-// This file can be used for general JavaScript functionality
+// Enable Bootstrap tooltips
+var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+  return new bootstrap.Tooltip(tooltipTriggerEl)
+})
 
-// Example: Add a simple animation to flash messages
-document.addEventListener('DOMContentLoaded', () => {
-    const flashMessages = document.querySelectorAll('.flash-message');
-    flashMessages.forEach(message => {
-        message.style.opacity = '1';
-        setTimeout(() => {
-            message.style.opacity = '0';
-            setTimeout(() => {
-                message.remove();
-            }, 300);
-        }, 3000);
+// Smooth scrolling for anchor links
+document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function (e) {
+        e.preventDefault();
+
+        document.querySelector(this.getAttribute('href')).scrollIntoView({
+            behavior: 'smooth'
+        });
     });
 });
+
+// Add fade-in effect to cards
+function fadeInCards() {
+    const cards = document.querySelectorAll('.card');
+    cards.forEach((card, index) => {
+        setTimeout(() => {
+            card.classList.add('fade-in');
+        }, index * 100);
+    });
+}
+
+// Call fadeInCards when the page loads
+window.addEventListener('load', fadeInCards);
+
+// Implement infinite scrolling for auction listings
+let page = 1;
+const auctionList = document.querySelector('.auction-list');
+const loadMoreButton = document.getElementById('load-more');
+
+if (loadMoreButton) {
+    loadMoreButton.addEventListener('click', loadMoreAuctions);
+}
+
+function loadMoreAuctions() {
+    page++;
+    fetch(`/api/auctions?page=${page}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.auctions.length > 0) {
+                data.auctions.forEach(auction => {
+                    const auctionCard = createAuctionCard(auction);
+                    auctionList.appendChild(auctionCard);
+                });
+                fadeInCards();
+            } else {
+                loadMoreButton.style.display = 'none';
+            }
+        })
+        .catch(error => console.error('Error:', error));
+}
+
+function createAuctionCard(auction) {
+    const card = document.createElement('div');
+    card.className = 'card auction-card';
+    card.innerHTML = `
+        <div class="card-body">
+            <h5 class="card-title">${auction.title}</h5>
+            <p class="card-text">${auction.description}</p>
+            <p class="card-text"><strong>Current Price:</strong> ${auction.current_price} XTR</p>
+            <p class="card-text"><strong>Ends at:</strong> ${new Date(auction.end_time).toLocaleString()}</p>
+        </div>
+        <div class="card-footer">
+            <a href="/auction/${auction.id}" class="btn btn-primary">View Details</a>
+        </div>
+    `;
+    return card;
+}
+
+// Add to watchlist functionality
+const watchlistButtons = document.querySelectorAll('.watchlist-btn');
+watchlistButtons.forEach(button => {
+    button.addEventListener('click', function(e) {
+        e.preventDefault();
+        const auctionId = this.dataset.auctionId;
+        const action = this.dataset.action;
+        
+        fetch(`/api/${action}_watchlist/${auctionId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': getCookie('csrf_token')
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                this.innerHTML = action === 'add' ? '<i class="fas fa-star"></i> Remove from Watchlist' : '<i class="far fa-star"></i> Add to Watchlist';
+                this.dataset.action = action === 'add' ? 'remove' : 'add';
+                showNotification(data.message, 'success');
+            } else {
+                showNotification(data.message, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showNotification('An error occurred. Please try again.', 'error');
+        });
+    });
+});
+
+function getCookie(name) {
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop().split(';').shift();
+}
+
+function showNotification(message, type) {
+    const notification = document.createElement('div');
+    notification.className = `alert alert-${type} alert-dismissible fade show`;
+    notification.role = 'alert';
+    notification.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    `;
+    document.querySelector('main').insertAdjacentElement('afterbegin', notification);
+    setTimeout(() => {
+        notification.remove();
+    }, 5000);
+}
