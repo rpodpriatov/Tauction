@@ -9,7 +9,7 @@
 <div class="row">
     <div class="col-md-8">
         <h1 class="mb-4 fade-in">{{ auction.title }}</h1>
-        <div class="card mb-4 fade-in">
+        <div class="card mb-4 fade-in" data-auction-id="{{ auction.id }}">
             <div class="card-body">
                 <p class="card-text">{{ auction.description }}</p>
                 <p class="card-text"><strong>Current Price:</strong> <span id="current-price">{{ auction.current_price }}</span> XTR</p>
@@ -109,6 +109,7 @@
         const bidHistoryElement = document.getElementById('bid-history');
         const toastElement = document.getElementById('liveToast');
         const toast = new bootstrap.Toast(toastElement);
+        const auctionId = document.querySelector('.card[data-auction-id]').dataset.auctionId;
 
         function updateCountdown() {
             const now = new Date().getTime();
@@ -133,13 +134,20 @@
 
         // Real-time bid updates
         function updateBids() {
-            fetch(`/api/auction/${auction.id}/bids`)
-                .then(response => response.json())
+            fetch(`/api/auction/${auctionId}/bids`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
                     currentPriceElement.textContent = data.current_price;
                     bidHistoryElement.innerHTML = data.bid_history_html;
                 })
-                .catch(error => console.error('Error:', error));
+                .catch(error => {
+                    console.error('Error fetching bid data:', error);
+                });
         }
 
         setInterval(updateBids, 5000);
@@ -148,7 +156,7 @@
         bidForm.addEventListener('submit', function(e) {
             e.preventDefault();
             const formData = new FormData(bidForm);
-            
+
             fetch(bidForm.action, {
                 method: 'POST',
                 body: formData,
@@ -156,7 +164,12 @@
                     'X-Requested-With': 'XMLHttpRequest'
                 }
             })
-            .then(response => response.json())
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
             .then(data => {
                 if (data.success) {
                     currentPriceElement.textContent = data.new_price;
@@ -167,7 +180,7 @@
                 }
             })
             .catch(error => {
-                console.error('Error:', error);
+                console.error('Error placing bid:', error);
                 showToast('Error', 'An error occurred while placing your bid. Please try again.', 'danger');
             });
         });

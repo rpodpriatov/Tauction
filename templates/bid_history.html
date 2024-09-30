@@ -1,0 +1,15 @@
+{% if bids %}
+    <ul class="list-group">
+        {% for bid in bids %}
+            <li class="list-group-item d-flex justify-content-between align-items-center fade-in">
+                <div>
+                    <strong>{{ bid.bidder.username }}</strong> bid
+                    <strong>{{ bid.amount }} XTR</strong>
+                </div>
+                <small class="text-muted">{{ bid.timestamp.strftime('%Y-%m-%d %H:%M') }}</small>
+            </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p class="alert alert-info fade-in">No bids yet.</p>
+{% endif %}

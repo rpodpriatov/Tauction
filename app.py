@@ -34,18 +34,15 @@ logger = logging.getLogger(__name__)
 login_manager = LoginManager(app)
 login_manager.login_view = 'auth.login'
 
-
 @login_manager.user_loader
 def load_user(user_id):
     return db_session.get(User, int(user_id))
-
 
 app.register_blueprint(auth)
 app.register_blueprint(admin)
 
 with app.app_context():
     init_db()
-
 
 @app.route('/')
 def index():
@@ -54,7 +51,6 @@ def index():
     return render_template('index.html',
                            active_auctions=active_auctions,
                            inactive_auctions=inactive_auctions)
-
 
 @app.route('/api/active_auctions', methods=['GET'])
 def get_active_auctions():
@@ -119,18 +115,27 @@ def get_active_auctions():
                 return jsonify({'error': 'Database connection error'}), 500
             time.sleep(2**attempt)
 
+@app.route('/api/auction/<int:auction_id>/bids')
+def get_auction_bids(auction_id):
+    auction = Auction.query.get_or_404(auction_id)
+    bids = Bid.query.filter_by(auction_id=auction_id).order_by(Bid.timestamp.desc()).limit(10).all()
+    
+    bid_history_html = render_template('bid_history.html', bids=bids)
+    
+    return jsonify({
+        'current_price': auction.current_price,
+        'bid_history_html': bid_history_html
+    })
 
 @app.route('/watchlist')
 @login_required
 def watchlist():
     return render_template('watchlist.html', auctions=current_user.watchlist)
 
-
 @app.route('/profile')
 @login_required
 def profile():
     return render_template('profile.html')
-
 
 @app.route('/add_to_watchlist/<int:auction_id>', methods=['POST'])
 @login_required
@@ -139,11 +144,9 @@ def add_to_watchlist(auction_id):
     if auction and auction not in current_user.watchlist:
         current_user.watchlist.append(auction)
         db_session.commit()
-        flash('Аукцион добавлен в избранное.', 'success')
+        return jsonify({'success': True, 'message': 'Auction added to watchlist.'}), 200
     else:
-        flash('Аукцион уже в избранном или не существует.', 'warning')
-    return redirect(url_for('auction_detail', auction_id=auction_id))
-
+        return jsonify({'success': False, 'message': 'Auction already in watchlist or does not exist.'}), 400
 
 @app.route('/remove_from_watchlist/<int:auction_id>', methods=['POST'])
 @login_required
@@ -152,11 +155,9 @@ def remove_from_watchlist(auction_id):
     if auction and auction in current_user.watchlist:
         current_user.watchlist.remove(auction)
         db_session.commit()
-        flash('Аукцион удалён из избранного.', 'success')
+        return jsonify({'success': True, 'message': 'Auction removed from watchlist.'}), 200
     else:
-        flash('Аукцион не найден в вашем избранном.', 'warning')
-    return redirect(url_for('watchlist'))
-
+        return jsonify({'success': False, 'message': 'Auction not found in your watchlist.'}), 404
 
 @app.route('/create_auction', methods=['GET', 'POST'])
 @login_required
@@ -177,7 +178,6 @@ def create_auction():
                            title='Создать Аукцион',
                            form=form)
 
-
 @app.route('/auction/<int:auction_id>', methods=['GET', 'POST'])
 def auction_detail(auction_id):
     auction = db_session.get(Auction, auction_id)
@@ -188,8 +188,7 @@ def auction_detail(auction_id):
 
     if bid_form.validate_on_submit():
         if not auction.is_active:
-            flash('This auction has ended. Bidding is no longer allowed.',
-                  'warning')
+            flash('This auction has ended. Bidding is no longer allowed.', 'warning')
         else:
             bid_amount = bid_form.amount.data
             user = current_user
@@ -199,58 +198,56 @@ def auction_detail(auction_id):
                 return redirect(url_for('auth.login'))
 
             if bid_amount <= auction.current_price:
-                flash('Your bid must be higher than the current price.',
-                      'danger')
+                flash('Your bid must be higher than the current price.', 'danger')
             elif user.xtr_balance < bid_amount:
                 flash('You don\'t have enough XTR for this bid.', 'danger')
             else:
                 try:
-                    new_bid = Bid(amount=bid_amount,
-                                  bidder=user,
-                                  auction=auction)
+                    new_bid = Bid(amount=bid_amount, bidder=user, auction=auction)
                     db_session.add(new_bid)
 
                     auction.current_price = bid_amount
                     db_session.commit()
 
-                    logger.info(
-                        f"New bid placed: User {user.id} bid {bid_amount} on Auction {auction.id}"
-                    )
+                    logger.info(f"New bid placed: User {user.id} bid {bid_amount} on Auction {auction.id}")
 
-                    flash('Your bid has been successfully placed!', 'success')
-                    return redirect(
-                        url_for('auction_detail', auction_id=auction_id))
+                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                        bids = Bid.query.filter_by(auction_id=auction_id).order_by(Bid.timestamp.desc()).limit(10).all()
+                        bid_history_html = render_template('bid_history.html', bids=bids)
+                        return jsonify({'success': True, 'new_price': auction.current_price, 'bid_history_html': bid_history_html})
+                    else:
+                        flash('Your bid has been successfully placed!', 'success')
+                        return redirect(url_for('auction_detail', auction_id=auction_id))
                 except Exception as e:
                     db_session.rollback()
                     logger.error(f"Error placing bid: {e}")
-                    flash(
-                        'An error occurred while placing your bid. Please try again later.',
-                        'danger')
+                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                        return jsonify({'success': False, 'error': 'An error occurred while placing your bid. Please try again later.'})
+                    else:
+                        flash('An error occurred while placing your bid. Please try again later.', 'danger')
 
-    bids = db_session.query(Bid).filter_by(auction_id=auction_id).order_by(
-        Bid.amount.desc()).all()
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'success': False, 'error': 'Invalid form data'})
+
+    bids = db_session.query(Bid).filter_by(auction_id=auction_id).order_by(Bid.amount.desc()).all()
 
     return render_template('auction_detail.html',
                            auction=auction,
                            bids=bids,
                            bid_form=bid_form)
 
-
 @app.errorhandler(404)
 def not_found_error(error):
     return render_template('errors/404.html'), 404
-
 
 @app.errorhandler(500)
 def internal_error(error):
     db_session.rollback()
     return render_template('errors/500.html'), 500
 
-
 @app.teardown_appcontext
 def shutdown_session(exception=None):
     db_session.remove()
-
 
 @app.route('/yoomoney_ipn', methods=['POST'])
 def yoomoney_ipn():
@@ -303,8 +300,6 @@ def yoomoney_ipn():
         logger.error(f"Error processing YooMoney IPN: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
-
-# Функция для закрытия аукционов
 async def close_auctions():
     current_time = datetime.utcnow()
     logger.info(f"Running close_auctions at {current_time}")
@@ -348,8 +343,6 @@ async def close_auctions():
         logger.error(f"Error in close_auctions: {str(e)}")
         db_session.rollback()
 
-
-# Основная асинхронная функция
 async def main():
     bot_application = setup_bot()
     scheduler = AsyncIOScheduler()
@@ -379,7 +372,6 @@ async def main():
         await bot_application.shutdown()
         scheduler.shutdown()
         logging.info("Application shutdown complete")
-
 
 if __name__ == '__main__':
     asyncio.run(main())
