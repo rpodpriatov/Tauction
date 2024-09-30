@@ -23,6 +23,14 @@ args = "Update Schema"
 task = "workflow.run"
 args = "Flask Server"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Create Migration"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Check Database Schema"
+
 [[workflows.workflow]]
 name = "Start Flask App"
 author = "agent"
@@ -57,6 +65,28 @@ agentRequireRestartOnSave = false
 task = "shell.exec"
 args = "python app.py"
 waitForPort = 5000
+
+[[workflows.workflow]]
+name = "Create Migration"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "flask db init && flask db migrate -m 'Initial migration' && flask db upgrade"
+
+[[workflows.workflow]]
+name = "Check Database Schema"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python -c 'from models import User, Auction; print(User.__table__.columns); print(Auction.__table__.columns)'"
 
 [deployment]
 run = ["sh", "-c", "python app.py"]

@@ -42,7 +42,6 @@ class Auction(Base):
     bids = relationship('Bid', back_populates='auction')
     watchers = relationship('User', secondary=watchlist, back_populates='watchlist')
     auction_type = Column(Enum(AuctionType), nullable=False)
-    # New fields for Dutch auctions
     current_dutch_price = Column(Float)
     dutch_price_decrement = Column(Float)
     dutch_interval = Column(Integer)  # Interval in seconds

@@ -3,12 +3,13 @@ import logging
 from datetime import datetime, timedelta
 from flask import Flask, render_template, redirect, url_for, flash, abort, request, jsonify
 from flask_login import LoginManager, login_required, current_user
+from flask_migrate import Migrate
 from config import Config
 from models import User, Auction, Subscriber, Bid, AuctionType
 from auth import auth
 from admin import admin
 from telegram_bot import setup_bot, send_notification
-from db import db_session, init_db
+from db import db_session, init_db, engine
 from forms import AuctionForm, BidForm
 import asyncio
 from hypercorn.asyncio import serve
@@ -23,6 +24,8 @@ logger = logging.getLogger(__name__)
 
 login_manager = LoginManager(app)
 login_manager.login_view = 'auth.login'
+
+migrate = Migrate(app, db_session)
 
 @login_manager.user_loader
 def load_user(user_id):
