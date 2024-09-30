@@ -70,7 +70,7 @@
                     <div class="mb-3">
                         {{ bid_form.amount.label(class="form-label") }}
                         {{ bid_form.amount(class="form-control", placeholder="Enter your bid amount") }}
-                        <div id="bidHelp" class="form-text">Your bid must be higher than the current price of {{ auction.current_price }} XTR.</div>
+                        <div id="bidHelp" class="form-text">Your bid must be higher than the current price of <span id="min-bid-amount">{{ auction.current_price }}</span> XTR.</div>
                         {% for error in bid_form.amount.errors %}
                             <span class="text-danger">{{ error }}</span>
                         {% endfor %}
@@ -110,6 +110,8 @@
         const toastElement = document.getElementById('liveToast');
         const toast = new bootstrap.Toast(toastElement);
         const auctionId = document.querySelector('.card[data-auction-id]').dataset.auctionId;
+        const bidModal = new bootstrap.Modal(document.getElementById('bidModal'));
+        const minBidAmountElement = document.getElementById('min-bid-amount');
 
         function updateCountdown() {
             const now = new Date().getTime();
@@ -143,6 +145,7 @@
                 })
                 .then(data => {
                     currentPriceElement.textContent = data.current_price;
+                    minBidAmountElement.textContent = data.current_price;
                     bidHistoryElement.innerHTML = data.bid_history_html;
                 })
                 .catch(error => {
@@ -173,8 +176,10 @@
             .then(data => {
                 if (data.success) {
                     currentPriceElement.textContent = data.new_price;
+                    minBidAmountElement.textContent = data.new_price;
                     bidHistoryElement.innerHTML = data.bid_history_html;
                     showToast('Success', 'Your bid has been placed successfully!', 'success');
+                    bidModal.hide(); // Close the modal after successful bid
                 } else {
                     showToast('Error', data.error, 'danger');
                 }

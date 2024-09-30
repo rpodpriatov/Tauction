@@ -126,4 +126,21 @@ document.addEventListener('DOMContentLoaded', function() {
             form.classList.add('was-validated');
         }, false);
     });
+
+    // Update minimum bid amount
+    function updateMinBidAmount() {
+        const currentPriceElements = document.querySelectorAll('.current-price');
+        const minBidAmountElements = document.querySelectorAll('.min-bid-amount');
+        
+        currentPriceElements.forEach((element, index) => {
+            const currentPrice = parseFloat(element.textContent);
+            if (minBidAmountElements[index]) {
+                minBidAmountElements[index].textContent = (currentPrice + 0.1).toFixed(1);
+            }
+        });
+    }
+
+    // Call updateMinBidAmount initially and set interval
+    updateMinBidAmount();
+    setInterval(updateMinBidAmount, 5000);
 });
