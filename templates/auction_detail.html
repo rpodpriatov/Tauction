@@ -1,5 +1,10 @@
 {% extends "base.html" %}
 
+{% block breadcrumb %}
+    <li class="breadcrumb-item"><a href="{{ url_for('index') }}">Auctions</a></li>
+    <li class="breadcrumb-item active" aria-current="page">{{ auction.title }}</li>
+{% endblock %}
+
 {% block content %}
 <div class="row">
     <div class="col-md-8">
@@ -7,13 +12,8 @@
         <div class="card mb-4 fade-in" data-auction-id="{{ auction.id }}">
             <div class="card-body">
                 <p class="card-text">{{ auction.description }}</p>
-                <p class="card-text"><strong>Auction Type:</strong> {{ auction.auction_type.value }}</p>
                 <p class="card-text"><strong>Current Price:</strong> <span id="current-price">{{ auction.current_price }}</span> XTR</p>
-                {% if auction.auction_type.value != 'Perpetual' %}
-                    <p class="card-text"><strong>Time Remaining:</strong> <span id="countdown" data-end-time="{{ auction.end_time.isoformat() }}"></span></p>
-                {% else %}
-                    <p class="card-text"><strong>Next Reset:</strong> <span id="countdown" data-end-time="{{ auction.end_time.isoformat() }}"></span></p>
-                {% endif %}
+                <p class="card-text"><strong>Time Remaining:</strong> <span id="countdown" data-end-time="{{ auction.end_time.isoformat() }}"></span></p>
                 <p class="card-text"><strong>Creator:</strong> {{ auction.creator.username }}</p>
                 
                 {% if current_user.is_authenticated %}
@@ -26,13 +26,6 @@
         </div>
 
         {% if auction.is_active and current_user.is_authenticated %}
-            {% if auction.auction_type.value == 'Dutch' %}
-                <p class="alert alert-info">This is a Dutch auction. The price will decrease over time. Click 'Place a Bid' to purchase at the current price.</p>
-            {% elif auction.auction_type.value == 'Sealed-bid' %}
-                <p class="alert alert-info">This is a Sealed-bid auction. Your bid will not be visible to others until the auction ends.</p>
-            {% elif auction.auction_type.value == 'Perpetual' %}
-                <p class="alert alert-info">This is a Perpetual auction. The auction will be extended by 24 hours each time a new bid is placed.</p>
-            {% endif %}
             <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#bidModal">
                 Place a Bid
             </button>
@@ -44,24 +37,20 @@
     <div class="col-md-4">
         <h3 class="mb-3 fade-in">Bid History</h3>
         <div id="bid-history">
-            {% if auction.auction_type.value != 'Sealed-bid' or not auction.is_active %}
-                {% if bids %}
-                    <ul class="list-group">
-                        {% for bid in bids %}
-                            <li class="list-group-item d-flex justify-content-between align-items-center fade-in">
-                                <div>
-                                    <strong>{{ bid.bidder.username }}</strong> bid
-                                    <strong>{{ bid.amount }} XTR</strong>
-                                </div>
-                                <small class="text-muted">{{ bid.timestamp.strftime('%Y-%m-%d %H:%M') }}</small>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p class="alert alert-info fade-in">No bids yet.</p>
-                {% endif %}
+            {% if bids %}
+                <ul class="list-group">
+                    {% for bid in bids %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center fade-in">
+                            <div>
+                                <strong>{{ bid.bidder.username }}</strong> bid
+                                <strong>{{ bid.amount }} XTR</strong>
+                            </div>
+                            <small class="text-muted">{{ bid.timestamp.strftime('%Y-%m-%d %H:%M') }}</small>
+                        </li>
+                    {% endfor %}
+                </ul>
             {% else %}
-                <p class="alert alert-info fade-in">Bid history will be revealed when the auction ends.</p>
+                <p class="alert alert-info fade-in">No bids yet.</p>
             {% endif %}
         </div>
     </div>
@@ -81,15 +70,7 @@
                     <div class="mb-3">
                         {{ bid_form.amount.label(class="form-label") }}
                         {{ bid_form.amount(class="form-control", placeholder="Enter your bid amount") }}
-                        <div id="bidHelp" class="form-text">
-                            {% if auction.auction_type.value == 'Dutch' %}
-                                For Dutch auctions, you must bid the current price of <span id="min-bid-amount">{{ auction.current_price }}</span> XTR.
-                            {% elif auction.auction_type.value == 'Sealed-bid' %}
-                                Enter your best bid. It will not be revealed until the auction ends.
-                            {% else %}
-                                Your bid must be higher than the current price of <span id="min-bid-amount">{{ auction.current_price }}</span> XTR.
-                            {% endif %}
-                        </div>
+                        <div id="bidHelp" class="form-text">Your bid must be higher than the current price of <span id="min-bid-amount">{{ auction.current_price }}</span> XTR.</div>
                         {% for error in bid_form.amount.errors %}
                             <span class="text-danger">{{ error }}</span>
                         {% endfor %}
@@ -131,7 +112,6 @@
         const auctionId = document.querySelector('.card[data-auction-id]').dataset.auctionId;
         const bidModal = new bootstrap.Modal(document.getElementById('bidModal'));
         const minBidAmountElement = document.getElementById('min-bid-amount');
-        const auctionType = '{{ auction.auction_type.value }}';
 
         function updateCountdown() {
             const now = new Date().getTime();
@@ -146,12 +126,8 @@
 
                 countdownElement.textContent = `${days}d ${hours}h ${minutes}m ${seconds}s`;
             } else {
-                if (auctionType === 'Perpetual') {
-                    countdownElement.textContent = "Resetting...";
-                } else {
-                    countdownElement.textContent = "Auction ended";
-                    submitBidButton.disabled = true;
-                }
+                countdownElement.textContent = "Auction ended";
+                submitBidButton.disabled = true;
             }
         }
 
@@ -170,9 +146,7 @@
                 .then(data => {
                     currentPriceElement.textContent = data.current_price;
                     minBidAmountElement.textContent = data.current_price;
-                    if (auctionType !== 'Sealed-bid' || !{{ auction.is_active|tojson }}) {
-                        bidHistoryElement.innerHTML = data.bid_history_html;
-                    }
+                    bidHistoryElement.innerHTML = data.bid_history_html;
                 })
                 .catch(error => {
                     console.error('Error fetching bid data:', error);
@@ -203,9 +177,7 @@
                 if (data.success) {
                     currentPriceElement.textContent = data.new_price;
                     minBidAmountElement.textContent = data.new_price;
-                    if (auctionType !== 'Sealed-bid') {
-                        bidHistoryElement.innerHTML = data.bid_history_html;
-                    }
+                    bidHistoryElement.innerHTML = data.bid_history_html;
                     showToast('Success', 'Your bid has been placed successfully!', 'success');
                     bidModal.hide(); // Close the modal after successful bid
                 } else {

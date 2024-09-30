@@ -40,13 +40,6 @@
                         {% endfor %}
                     </div>
                     <div class="mb-3">
-                        {{ form.auction_type.label(class="form-label") }}
-                        {{ form.auction_type(class="form-select") }}
-                        {% for error in form.auction_type.errors %}
-                        <span class="text-danger">{{ error }}</span>
-                        {% endfor %}
-                    </div>
-                    <div class="mb-3">
                         {{ form.submit(class="btn btn-primary") }}
                     </div>
                 </form>
@@ -58,6 +51,7 @@
 
 {% block scripts %}
 <script>
+    // Set minimum date-time for end_time input
     document.addEventListener('DOMContentLoaded', function() {
         var now = new Date();
         now.setMinutes(now.getMinutes() + 5); // Set minimum time to 5 minutes from now
@@ -68,20 +62,6 @@
         var minutes = now.getMinutes().toString().padStart(2, '0');
         var minDateTime = `${year}-${month}-${day}T${hours}:${minutes}`;
         document.getElementById('end_time').min = minDateTime;
-
-        // Add event listener for auction type change
-        document.getElementById('auction_type').addEventListener('change', function() {
-            var endTimeField = document.getElementById('end_time');
-            var endTimeLabel = document.querySelector('label[for="end_time"]');
-            
-            if (this.value === 'PERPETUAL') {
-                endTimeLabel.textContent = 'Initial Reset Time';
-                endTimeField.required = true;
-            } else {
-                endTimeLabel.textContent = 'End Time';
-                endTimeField.required = true;
-            }
-        });
     });
 </script>
 {% endblock %}
