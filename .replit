@@ -79,7 +79,7 @@ agentRequireRestartOnSave = false
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "flask db init && flask db migrate -m 'Add missing columns' && flask db upgrade"
+args = "flask db migrate -m 'Add missing columns'"
 
 [[workflows.workflow]]
 name = "Check Database Schema"
