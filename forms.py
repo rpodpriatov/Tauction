@@ -1,26 +1,18 @@
-# forms.py
-
 from flask_wtf import FlaskForm
-from wtforms import StringField, TextAreaField, FloatField, DateTimeField, SubmitField
-from wtforms.validators import DataRequired, Length, NumberRange  # Добавлен импорт NumberRange
+from wtforms import StringField, TextAreaField, FloatField, DateTimeField, SubmitField, SelectField, IntegerField
+from wtforms.validators import DataRequired, Length, NumberRange
+from models import AuctionType
 
 class AuctionForm(FlaskForm):
-    title = StringField('Название', validators=[DataRequired(), Length(min=1, max=100)])
-    description = TextAreaField('Описание', validators=[Length(max=500)])
-    starting_price = FloatField('Начальная Цена', validators=[DataRequired()])
-    end_time = DateTimeField(
-        'Время окончания',
-        format='%Y-%m-%dT%H:%M',  # Формат соответствует datetime-local в HTML5
-        validators=[DataRequired()]
-    )
-    submit = SubmitField('Создать Аукцион')
+    title = StringField('Title', validators=[DataRequired(), Length(max=100)])
+    description = TextAreaField('Description', validators=[Length(max=500)])
+    starting_price = FloatField('Starting Price', validators=[DataRequired(), NumberRange(min=0)])
+    end_time = DateTimeField('End Time', validators=[DataRequired()], format='%Y-%m-%dT%H:%M')
+    auction_type = SelectField('Auction Type', choices=[(t.name, t.value) for t in AuctionType], validators=[DataRequired()])
+    dutch_price_decrement = FloatField('Price Decrement (Dutch)', validators=[NumberRange(min=0)])
+    dutch_interval = IntegerField('Interval in seconds (Dutch)', validators=[NumberRange(min=1)])
+    submit = SubmitField('Create Auction')
 
 class BidForm(FlaskForm):
-    amount = FloatField(
-        'Ваша ставка (XTR)',
-        validators=[
-            DataRequired(message="Пожалуйста, введите сумму ставки."),
-            NumberRange(min=0.01, message="Сумма ставки должна быть больше 0.")
-        ]
-    )
-    submit = SubmitField('Сделать ставку')
+    amount = FloatField('Bid Amount', validators=[DataRequired(), NumberRange(min=0)])
+    submit = SubmitField('Place Bid')

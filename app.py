@@ -1,12 +1,10 @@
-# app.py
-
 import os
 import logging
 import time
 from flask import Flask, render_template, redirect, url_for, jsonify, request, flash, abort
 from flask_login import LoginManager, login_required, current_user
 from config import Config
-from models import User, Auction, Subscriber, Bid
+from models import User, Auction, Subscriber, Bid, AuctionType
 from auth import auth
 from admin import admin
 from telegram_bot import setup_bot, send_notification
@@ -166,19 +164,30 @@ def remove_from_watchlist(auction_id):
 def create_auction():
     form = AuctionForm()
     if form.validate_on_submit():
-        new_auction = Auction(title=form.title.data,
-                              description=form.description.data,
-                              current_price=form.starting_price.data,
-                              end_time=form.end_time.data,
-                              is_active=True,
-                              creator=current_user)
+        auction_type = AuctionType[form.auction_type.data]
+        new_auction = Auction(
+            title=form.title.data,
+            description=form.description.data,
+            starting_price=form.starting_price.data,
+            current_price=form.starting_price.data,
+            end_time=form.end_time.data,
+            is_active=True,
+            creator=current_user,
+            auction_type=auction_type
+        )
+        
+        if auction_type == AuctionType.DUTCH:
+            new_auction.current_dutch_price = form.starting_price.data
+            new_auction.dutch_price_decrement = form.dutch_price_decrement.data
+            new_auction.dutch_interval = form.dutch_interval.data
+        elif auction_type == AuctionType.EVERLASTING:
+            new_auction.end_time = datetime.utcnow() + timedelta(years=100)  # Set a very far future date
+        
         db_session.add(new_auction)
         db_session.commit()
-        flash('Ваш аукцион создан!', 'success')
+        flash('Your auction has been created!', 'success')
         return redirect(url_for('index'))
-    return render_template('create_auction.html',
-                           title='Создать Аукцион',
-                           form=form)
+    return render_template('create_auction.html', title='Create Auction', form=form)
 
 @app.route('/auction/<int:auction_id>', methods=['GET', 'POST'])
 def auction_detail(auction_id):
@@ -199,37 +208,41 @@ def auction_detail(auction_id):
                 flash('Please log in to place a bid.', 'warning')
                 return redirect(url_for('auth.login'))
 
-            if bid_amount <= auction.current_price:
-                flash('Your bid must be higher than the current price.', 'danger')
-            elif user.xtr_balance < bid_amount:
-                flash('You don\'t have enough XTR for this bid.', 'danger')
-            else:
-                try:
+            if auction.auction_type == AuctionType.DUTCH:
+                if bid_amount != auction.current_dutch_price:
+                    flash('For Dutch auctions, you must accept the current price.', 'danger')
+                else:
+                    # End the auction immediately for Dutch auctions
+                    auction.is_active = False
+                    auction.current_price = bid_amount
                     new_bid = Bid(amount=bid_amount, bidder=user, auction=auction)
                     db_session.add(new_bid)
-
-                    auction.current_price = bid_amount
                     db_session.commit()
+                    flash('Congratulations! You won the Dutch auction!', 'success')
+            elif auction.auction_type == AuctionType.CLOSED:
+                # For closed auctions, we don't update the current price
+                if bid_amount <= auction.starting_price:
+                    flash('Your bid must be higher than the starting price.', 'danger')
+                elif user.xtr_balance < bid_amount:
+                    flash('You don\'t have enough XTR for this bid.', 'danger')
+                else:
+                    new_bid = Bid(amount=bid_amount, bidder=user, auction=auction)
+                    db_session.add(new_bid)
+                    db_session.commit()
+                    flash('Your bid has been placed successfully!', 'success')
+            else:  # English and Everlasting auctions
+                if bid_amount <= auction.current_price:
+                    flash('Your bid must be higher than the current price.', 'danger')
+                elif user.xtr_balance < bid_amount:
+                    flash('You don\'t have enough XTR for this bid.', 'danger')
+                else:
+                    auction.current_price = bid_amount
+                    new_bid = Bid(amount=bid_amount, bidder=user, auction=auction)
+                    db_session.add(new_bid)
+                    db_session.commit()
+                    flash('Your bid has been successfully placed!', 'success')
 
-                    logger.info(f"New bid placed: User {user.id} bid {bid_amount} on Auction {auction.id}")
-
-                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                        bids = Bid.query.filter_by(auction_id=auction_id).order_by(Bid.timestamp.desc()).limit(10).all()
-                        bid_history_html = render_template('bid_history.html', bids=bids)
-                        return jsonify({'success': True, 'new_price': auction.current_price, 'bid_history_html': bid_history_html})
-                    else:
-                        flash('Your bid has been successfully placed!', 'success')
-                        return redirect(url_for('auction_detail', auction_id=auction_id))
-                except Exception as e:
-                    db_session.rollback()
-                    logger.error(f"Error placing bid: {e}")
-                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                        return jsonify({'success': False, 'error': 'An error occurred while placing your bid. Please try again later.'})
-                    else:
-                        flash('An error occurred while placing your bid. Please try again later.', 'danger')
-
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return jsonify({'success': False, 'error': 'Invalid form data'})
+            return redirect(url_for('auction_detail', auction_id=auction_id))
 
     bids = db_session.query(Bid).filter_by(auction_id=auction_id).order_by(Bid.amount.desc()).all()
 
@@ -345,10 +358,31 @@ async def close_auctions():
         logger.error(f"Error in close_auctions: {str(e)}")
         db_session.rollback()
 
+async def update_dutch_auctions():
+    current_time = datetime.utcnow()
+    dutch_auctions = db_session.query(Auction).filter(
+        Auction.is_active == True,
+        Auction.auction_type == AuctionType.DUTCH
+    ).all()
+
+    for auction in dutch_auctions:
+        time_elapsed = (current_time - auction.end_time).total_seconds()
+        intervals_passed = int(time_elapsed / auction.dutch_interval)
+        new_price = auction.starting_price - (intervals_passed * auction.dutch_price_decrement)
+        
+        if new_price <= 0:
+            auction.is_active = False
+            logger.info(f"Dutch auction {auction.id} ended without a winner")
+        else:
+            auction.current_dutch_price = new_price
+
+    db_session.commit()
+
 async def main():
     bot_application = setup_bot()
     scheduler = AsyncIOScheduler()
     scheduler.add_job(close_auctions, 'interval', minutes=1)
+    scheduler.add_job(update_dutch_auctions, 'interval', seconds=10)  # Update Dutch auctions every 10 seconds
     scheduler.start()
 
     async def start_bot():
