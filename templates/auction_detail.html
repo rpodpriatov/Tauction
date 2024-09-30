@@ -10,6 +10,8 @@
                 <p class="card-text"><strong>Auction Type:</strong> {{ auction.auction_type.value }}</p>
                 {% if auction.auction_type.value == 'Dutch' %}
                     <p class="card-text"><strong>Current Price:</strong> <span id="current-price">{{ auction.current_dutch_price }}</span> XTR</p>
+                    <p class="card-text"><strong>Price Decrement:</strong> {{ auction.dutch_price_decrement }} XTR</p>
+                    <p class="card-text"><strong>Decrement Interval:</strong> {{ auction.dutch_interval }} seconds</p>
                 {% elif auction.auction_type.value == 'Closed' %}
                     <p class="card-text"><strong>Starting Price:</strong> {{ auction.starting_price }} XTR</p>
                 {% else %}
@@ -17,6 +19,8 @@
                 {% endif %}
                 {% if auction.auction_type.value != 'Everlasting' %}
                     <p class="card-text"><strong>Time Remaining:</strong> <span id="countdown" data-end-time="{{ auction.end_time.isoformat() }}"></span></p>
+                {% else %}
+                    <p class="card-text"><strong>Auction Type:</strong> Everlasting (No End Time)</p>
                 {% endif %}
                 <p class="card-text"><strong>Creator:</strong> {{ auction.creator.username }}</p>
                 

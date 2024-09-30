@@ -68,6 +68,8 @@ def create_auction():
             new_auction.dutch_interval = form.dutch_interval.data
         elif auction_type == AuctionType.EVERLASTING:
             new_auction.end_time = datetime.utcnow() + timedelta(years=100)  # Set a very far future date
+        elif auction_type == AuctionType.CLOSED:
+            new_auction.current_price = None  # Hide current price for closed auctions
         
         db_session.add(new_auction)
         db_session.commit()
@@ -116,7 +118,18 @@ def auction_detail(auction_id):
                     db_session.add(new_bid)
                     db_session.commit()
                     flash('Your bid has been placed successfully!', 'success')
-            else:  # English and Everlasting auctions
+            elif auction.auction_type == AuctionType.ENGLISH:
+                if bid_amount <= auction.current_price:
+                    flash('Your bid must be higher than the current price.', 'danger')
+                elif user.xtr_balance < bid_amount:
+                    flash('You don\'t have enough XTR for this bid.', 'danger')
+                else:
+                    auction.current_price = bid_amount
+                    new_bid = Bid(amount=bid_amount, bidder=user, auction=auction)
+                    db_session.add(new_bid)
+                    db_session.commit()
+                    flash('Your bid has been successfully placed!', 'success')
+            elif auction.auction_type == AuctionType.EVERLASTING:
                 if bid_amount <= auction.current_price:
                     flash('Your bid must be higher than the current price.', 'danger')
                 elif user.xtr_balance < bid_amount:
@@ -252,7 +265,7 @@ async def update_dutch_auctions():
     for auction in dutch_auctions:
         time_elapsed = (current_time - auction.end_time).total_seconds()
         intervals_passed = int(time_elapsed / auction.dutch_interval)
-        new_price = auction.starting_price - (intervals_passed * auction.dutch_price_decrement)
+        new_price = max(0, auction.starting_price - (intervals_passed * auction.dutch_price_decrement))
         
         if new_price <= 0:
             auction.is_active = False
