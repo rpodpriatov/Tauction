@@ -117,7 +117,9 @@ def get_active_auctions():
 
 @app.route('/api/auction/<int:auction_id>/bids')
 def get_auction_bids(auction_id):
-    auction = Auction.query.get_or_404(auction_id)
+    auction = Auction.query.filter_by(id=auction_id).first()
+    if auction is None:
+        return jsonify({'error': 'Auction not found'}), 404
     bids = Bid.query.filter_by(auction_id=auction_id).order_by(Bid.timestamp.desc()).limit(10).all()
     
     bid_history_html = render_template('bid_history.html', bids=bids)
