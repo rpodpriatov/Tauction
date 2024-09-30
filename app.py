@@ -1,12 +1,10 @@
-# app.py
-
 import os
 import logging
 import time
 from flask import Flask, render_template, redirect, url_for, jsonify, request, flash, abort
 from flask_login import LoginManager, login_required, current_user
 from config import Config
-from models import User, Auction, Subscriber, Bid
+from models import User, Auction, Subscriber, Bid, AuctionType
 from auth import auth
 from admin import admin
 from telegram_bot import setup_bot, send_notification
@@ -166,19 +164,21 @@ def remove_from_watchlist(auction_id):
 def create_auction():
     form = AuctionForm()
     if form.validate_on_submit():
-        new_auction = Auction(title=form.title.data,
-                              description=form.description.data,
-                              current_price=form.starting_price.data,
-                              end_time=form.end_time.data,
-                              is_active=True,
-                              creator=current_user)
+        new_auction = Auction(
+            title=form.title.data,
+            description=form.description.data,
+            starting_price=form.starting_price.data,
+            current_price=form.starting_price.data,
+            end_time=form.end_time.data,
+            is_active=True,
+            creator=current_user,
+            auction_type=AuctionType[form.auction_type.data]
+        )
         db_session.add(new_auction)
         db_session.commit()
-        flash('Ваш аукцион создан!', 'success')
+        flash('Your auction has been created!', 'success')
         return redirect(url_for('index'))
-    return render_template('create_auction.html',
-                           title='Создать Аукцион',
-                           form=form)
+    return render_template('create_auction.html', title='Create Auction', form=form)
 
 @app.route('/auction/<int:auction_id>', methods=['GET', 'POST'])
 def auction_detail(auction_id):
@@ -199,40 +199,54 @@ def auction_detail(auction_id):
                 flash('Please log in to place a bid.', 'warning')
                 return redirect(url_for('auth.login'))
 
-            if bid_amount <= auction.current_price:
-                flash('Your bid must be higher than the current price.', 'danger')
-            elif user.xtr_balance < bid_amount:
-                flash('You don\'t have enough XTR for this bid.', 'danger')
-            else:
-                try:
+            if auction.auction_type == AuctionType.DUTCH:
+                if bid_amount != auction.current_price:
+                    flash('For Dutch auctions, you must bid the current price.', 'danger')
+                else:
+                    # End the auction immediately for Dutch auctions
+                    auction.is_active = False
                     new_bid = Bid(amount=bid_amount, bidder=user, auction=auction)
                     db_session.add(new_bid)
-
+                    db_session.commit()
+                    flash('Congratulations! You have won the Dutch auction.', 'success')
+                    return redirect(url_for('auction_detail', auction_id=auction_id))
+            elif auction.auction_type == AuctionType.SEALED_BID:
+                if auction.end_time > datetime.utcnow():
+                    new_bid = Bid(amount=bid_amount, bidder=user, auction=auction)
+                    db_session.add(new_bid)
+                    db_session.commit()
+                    flash('Your sealed bid has been placed successfully.', 'success')
+                else:
+                    flash('The sealed-bid auction has ended. No more bids are allowed.', 'warning')
+            elif auction.auction_type == AuctionType.PERPETUAL:
+                if bid_amount <= auction.current_price:
+                    flash('Your bid must be higher than the current price.', 'danger')
+                else:
+                    new_bid = Bid(amount=bid_amount, bidder=user, auction=auction)
+                    db_session.add(new_bid)
+                    auction.current_price = bid_amount
+                    auction.end_time = datetime.utcnow() + timedelta(hours=24)  # Extend auction by 24 hours
+                    db_session.commit()
+                    flash('Your bid has been placed successfully. The auction has been extended by 24 hours.', 'success')
+            else:  # English auction
+                if bid_amount <= auction.current_price:
+                    flash('Your bid must be higher than the current price.', 'danger')
+                else:
+                    new_bid = Bid(amount=bid_amount, bidder=user, auction=auction)
+                    db_session.add(new_bid)
                     auction.current_price = bid_amount
                     db_session.commit()
+                    flash('Your bid has been placed successfully!', 'success')
 
-                    logger.info(f"New bid placed: User {user.id} bid {bid_amount} on Auction {auction.id}")
-
-                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                        bids = Bid.query.filter_by(auction_id=auction_id).order_by(Bid.timestamp.desc()).limit(10).all()
-                        bid_history_html = render_template('bid_history.html', bids=bids)
-                        return jsonify({'success': True, 'new_price': auction.current_price, 'bid_history_html': bid_history_html})
-                    else:
-                        flash('Your bid has been successfully placed!', 'success')
-                        return redirect(url_for('auction_detail', auction_id=auction_id))
-                except Exception as e:
-                    db_session.rollback()
-                    logger.error(f"Error placing bid: {e}")
-                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-                        return jsonify({'success': False, 'error': 'An error occurred while placing your bid. Please try again later.'})
-                    else:
-                        flash('An error occurred while placing your bid. Please try again later.', 'danger')
-
-    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        return jsonify({'success': False, 'error': 'Invalid form data'})
+    if auction.auction_type == AuctionType.SEALED_BID and auction.end_time <= datetime.utcnow():
+        # Reveal the winning bid for sealed-bid auctions that have ended
+        winning_bid = db_session.query(Bid).filter_by(auction_id=auction.id).order_by(Bid.amount.desc()).first()
+        if winning_bid:
+            auction.current_price = winning_bid.amount
+            db_session.commit()
 
     bids = db_session.query(Bid).filter_by(auction_id=auction_id).order_by(Bid.amount.desc()).all()
-
+    
     return render_template('auction_detail.html',
                            auction=auction,
                            bids=bids,
@@ -316,30 +330,41 @@ async def close_auctions():
             return
 
         for auction in ended_auctions:
-            auction.is_active = False
-            logger.info(f"Closing auction {auction.id}: {auction.title}")
-
-            if auction.bids:
-                winning_bid = max(auction.bids, key=lambda bid: bid.amount)
-                winner = winning_bid.bidder
-                await send_notification(
-                    winner.telegram_id,
-                    f"Congratulations! You won the auction '{auction.title}' with a bid of {winning_bid.amount} XTR."
-                )
-                await send_notification(
-                    auction.creator.telegram_id,
-                    f"Your auction '{auction.title}' has ended. Winner: {winner.username} with a bid of {winning_bid.amount} XTR."
-                )
+            if auction.auction_type == AuctionType.PERPETUAL:
+                # For perpetual auctions, extend the end time by 24 hours
+                auction.end_time = current_time + timedelta(hours=24)
+                logger.info(f"Extended perpetual auction {auction.id}: {auction.title}")
             else:
-                await send_notification(
-                    auction.creator.telegram_id,
-                    f"Your auction '{auction.title}' has ended without any bids."
-                )
+                auction.is_active = False
+                logger.info(f"Closing auction {auction.id}: {auction.title}")
+
+                if auction.bids:
+                    if auction.auction_type == AuctionType.SEALED_BID:
+                        # For sealed-bid auctions, determine the winner after closing
+                        winning_bid = max(auction.bids, key=lambda bid: bid.amount)
+                        auction.current_price = winning_bid.amount
+                    else:
+                        winning_bid = max(auction.bids, key=lambda bid: (bid.amount, -bid.timestamp.timestamp()))
+                    
+                    winner = winning_bid.bidder
+                    await send_notification(
+                        winner.telegram_id,
+                        f"Congratulations! You won the {auction.auction_type.value} auction '{auction.title}' with a bid of {winning_bid.amount} XTR."
+                    )
+                    await send_notification(
+                        auction.creator.telegram_id,
+                        f"Your {auction.auction_type.value} auction '{auction.title}' has ended. Winner: {winner.username} with a bid of {winning_bid.amount} XTR."
+                    )
+                else:
+                    await send_notification(
+                        auction.creator.telegram_id,
+                        f"Your {auction.auction_type.value} auction '{auction.title}' has ended without any bids."
+                    )
 
             db_session.commit()
-            logger.info(f"Auction {auction.id} closed successfully")
+            logger.info(f"Auction {auction.id} processed successfully")
 
-        logger.info(f"Closed {len(ended_auctions)} auctions")
+        logger.info(f"Processed {len(ended_auctions)} auctions")
 
     except Exception as e:
         logger.error(f"Error in close_auctions: {str(e)}")
