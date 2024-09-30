@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey, Enum, Table
 from sqlalchemy.orm import relationship
 from flask_login import UserMixin
 from db import Base
@@ -9,6 +9,11 @@ class AuctionType(enum.Enum):
     DUTCH = "Dutch"
     SEALED_BID = "Sealed-bid"
     PERPETUAL = "Perpetual"
+
+watchlist = Table('watchlist', Base.metadata,
+    Column('user_id', Integer, ForeignKey('users.id')),
+    Column('auction_id', Integer, ForeignKey('auctions.id'))
+)
 
 class User(Base, UserMixin):
     __tablename__ = 'users'
@@ -20,7 +25,7 @@ class User(Base, UserMixin):
     xtr_balance = Column(Float, default=0.0)
     auctions = relationship('Auction', backref='creator', lazy='dynamic')
     bids = relationship('Bid', backref='bidder', lazy='dynamic')
-    watchlist = relationship('Auction', secondary='watchlist', backref='watchers')
+    watchlist = relationship('Auction', secondary=watchlist, backref='watchers')
 
 class Auction(Base):
     __tablename__ = 'auctions'
@@ -49,5 +54,3 @@ class Subscriber(Base):
     user_id = Column(Integer, ForeignKey('users.id'), unique=True, nullable=False)
     subscription_end = Column(DateTime, nullable=False)
     user = relationship('User', backref='subscriber', uselist=False)
-
-watchlist = Base.metadata.tables['watchlist']
