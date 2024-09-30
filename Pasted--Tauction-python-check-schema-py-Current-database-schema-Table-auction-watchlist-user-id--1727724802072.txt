@@ -1,0 +1,142 @@
+~/Tauction$ python check_schema.py 
+Current database schema:
+
+Table: auction_watchlist
+  - user_id: INTEGER
+  - auction_id: INTEGER
+
+Table: auctions
+  - id: INTEGER
+  - title: VARCHAR(120)
+  - description: VARCHAR(500)
+  - current_price: DOUBLE PRECISION
+  - end_time: TIMESTAMP
+  - is_active: BOOLEAN
+  - creator_id: INTEGER
+  - winner_id: INTEGER
+
+Table: users
+  - id: INTEGER
+  - telegram_id: VARCHAR(120)
+  - username: VARCHAR(64)
+  - xtr_balance: INTEGER
+  - is_admin: BOOLEAN
+  - is_active: BOOLEAN
+  - subscriber_id: INTEGER
+
+Table: subscribers
+  - id: INTEGER
+  - telegram_id: VARCHAR(120)
+  - username: VARCHAR(64)
+  - subscription_status: VARCHAR(50)
+  - subscription_end: TIMESTAMP
+
+Table: alembic_version
+  - version_num: VARCHAR(32)
+
+Table: bids
+  - id: INTEGER
+  - amount: DOUBLE PRECISION
+  - timestamp: TIMESTAMP
+  - bidder_id: INTEGER
+  - auction_id: INTEGER
+
+Table: watchlist
+  - user_id: INTEGER
+  - auction_id: INTEGER
+
+SQLAlchemy models:
+
+User model:
+  - id: INTEGER
+  - username: VARCHAR(64)
+  - email: VARCHAR(120)
+  - password_hash: VARCHAR(128)
+  - telegram_id: VARCHAR(64)
+  - xtr_balance: FLOAT
+
+Auction model:
+  - id: INTEGER
+  - title: VARCHAR(100)
+  - description: VARCHAR(500)
+  - starting_price: FLOAT
+  - current_price: FLOAT
+  - end_time: DATETIME
+  - is_active: BOOLEAN
+  - creator_id: INTEGER
+  - auction_type: VARCHAR(11)
+  - current_dutch_price: FLOAT
+  - dutch_price_decrement: FLOAT
+  - dutch_interval: INTEGER
+ Environment updated. Reloading shell...
+~/Tauction$ python check_schema.py 
+Current database schema:
+
+Table: auction_watchlist
+  - user_id: INTEGER
+  - auction_id: INTEGER
+
+Table: auctions
+  - id: INTEGER
+  - title: VARCHAR(120)
+  - description: VARCHAR(500)
+  - current_price: DOUBLE PRECISION
+  - end_time: TIMESTAMP
+  - is_active: BOOLEAN
+  - creator_id: INTEGER
+  - winner_id: INTEGER
+
+Table: users
+  - id: INTEGER
+  - telegram_id: VARCHAR(120)
+  - username: VARCHAR(64)
+  - xtr_balance: INTEGER
+  - is_admin: BOOLEAN
+  - is_active: BOOLEAN
+  - subscriber_id: INTEGER
+
+Table: subscribers
+  - id: INTEGER
+  - telegram_id: VARCHAR(120)
+  - username: VARCHAR(64)
+  - subscription_status: VARCHAR(50)
+  - subscription_end: TIMESTAMP
+
+Table: alembic_version
+  - version_num: VARCHAR(32)
+
+Table: bids
+  - id: INTEGER
+  - amount: DOUBLE PRECISION
+  - timestamp: TIMESTAMP
+  - bidder_id: INTEGER
+  - auction_id: INTEGER
+
+Table: watchlist
+  - user_id: INTEGER
+  - auction_id: INTEGER
+
+SQLAlchemy models:
+
+User model:
+  - id: INTEGER
+  - username: VARCHAR(64)
+  - email: VARCHAR(120)
+  - password_hash: VARCHAR(128)
+  - telegram_id: VARCHAR(64)
+  - xtr_balance: FLOAT
+
+Auction model:
+  - id: INTEGER
+  - title: VARCHAR(100)
+  - description: VARCHAR(500)
+  - starting_price: FLOAT
+  - current_price: FLOAT
+  - end_time: DATETIME
+  - is_active: BOOLEAN
+  - creator_id: INTEGER
+  - auction_type: VARCHAR(11)
+  - current_dutch_price: FLOAT
+  - dutch_price_decrement: FLOAT
+  - dutch_interval: INTEGER
+ Environment updated. Reloading shell...
