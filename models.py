@@ -1,5 +1,5 @@
 import enum
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean, Enum
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean, Enum, Table
 from sqlalchemy.orm import relationship
 from flask_login import UserMixin
 from db import Base
@@ -11,6 +11,11 @@ class AuctionType(enum.Enum):
     CLOSED = "Closed"
     EVERLASTING = "Everlasting"
 
+watchlist = Table('watchlist', Base.metadata,
+    Column('user_id', Integer, ForeignKey('users.id')),
+    Column('auction_id', Integer, ForeignKey('auctions.id'))
+)
+
 class User(UserMixin, Base):
     __tablename__ = 'users'
     id = Column(Integer, primary_key=True)
@@ -21,7 +26,7 @@ class User(UserMixin, Base):
     xtr_balance = Column(Float, default=0.0)
     auctions = relationship('Auction', back_populates='creator')
     bids = relationship('Bid', back_populates='bidder')
-    watchlist = relationship('Auction', secondary='watchlist', back_populates='watchers')
+    watchlist = relationship('Auction', secondary=watchlist, back_populates='watchers')
 
 class Auction(Base):
     __tablename__ = 'auctions'
@@ -35,7 +40,7 @@ class Auction(Base):
     creator_id = Column(Integer, ForeignKey('users.id'))
     creator = relationship('User', back_populates='auctions')
     bids = relationship('Bid', back_populates='auction')
-    watchers = relationship('User', secondary='watchlist', back_populates='watchlist')
+    watchers = relationship('User', secondary=watchlist, back_populates='watchlist')
     auction_type = Column(Enum(AuctionType), nullable=False)
     # New fields for Dutch auctions
     current_dutch_price = Column(Float)
@@ -57,5 +62,3 @@ class Subscriber(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey('users.id'))
     subscription_end = Column(DateTime)
-
-watchlist = Base.metadata.tables['watchlist']
