@@ -256,24 +256,31 @@ async def close_auctions():
         db_session.rollback()
 
 async def update_dutch_auctions():
-    current_time = datetime.utcnow()
-    dutch_auctions = db_session.query(Auction).filter(
-        Auction.is_active == True,
-        Auction.auction_type == AuctionType.DUTCH
-    ).all()
+    logger.info("Starting update_dutch_auctions")
+    try:
+        with db_session.begin():
+            current_time = datetime.utcnow()
+            dutch_auctions = db_session.query(Auction).filter(
+                Auction.is_active == True,
+                Auction.auction_type == AuctionType.DUTCH
+            ).all()
 
-    for auction in dutch_auctions:
-        time_elapsed = (current_time - auction.end_time).total_seconds()
-        intervals_passed = int(time_elapsed / auction.dutch_interval)
-        new_price = max(0, auction.starting_price - (intervals_passed * auction.dutch_price_decrement))
-        
-        if new_price <= 0:
-            auction.is_active = False
-            logger.info(f"Dutch auction {auction.id} ended without a winner")
-        else:
-            auction.current_dutch_price = new_price
+            for auction in dutch_auctions:
+                time_elapsed = (current_time - auction.end_time).total_seconds()
+                intervals_passed = int(time_elapsed / auction.dutch_interval)
+                new_price = max(0, auction.starting_price - (intervals_passed * auction.dutch_price_decrement))
+                
+                if new_price <= 0:
+                    auction.is_active = False
+                    logger.info(f"Dutch auction {auction.id} ended without a winner")
+                else:
+                    auction.current_dutch_price = new_price
 
-    db_session.commit()
+            db_session.commit()
+            logger.info(f"Updated {len(dutch_auctions)} Dutch auctions")
+    except Exception as e:
+        db_session.rollback()
+        logger.error(f'Error in update_dutch_auctions: {str(e)}')
 
 async def main():
     bot_application = setup_bot()
