@@ -15,7 +15,6 @@ import asyncio
 from hypercorn.asyncio import serve
 from hypercorn.config import Config as HyperConfig
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from sqlalchemy.exc import SQLAlchemyError
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -68,9 +67,9 @@ def create_auction():
             new_auction.dutch_price_decrement = form.dutch_price_decrement.data
             new_auction.dutch_interval = form.dutch_interval.data
         elif auction_type == AuctionType.EVERLASTING:
-            new_auction.end_time = datetime.utcnow() + timedelta(years=100)
+            new_auction.end_time = datetime.utcnow() + timedelta(years=100)  # Set a very far future date
         elif auction_type == AuctionType.CLOSED:
-            new_auction.current_price = None
+            new_auction.current_price = None  # Hide current price for closed auctions
         
         db_session.add(new_auction)
         db_session.commit()
@@ -101,6 +100,7 @@ def auction_detail(auction_id):
                 if bid_amount != auction.current_dutch_price:
                     flash('For Dutch auctions, you must accept the current price.', 'danger')
                 else:
+                    # End the auction immediately for Dutch auctions
                     auction.is_active = False
                     auction.current_price = bid_amount
                     new_bid = Bid(amount=bid_amount, bidder=user, auction=auction)
@@ -108,6 +108,7 @@ def auction_detail(auction_id):
                     db_session.commit()
                     flash('Congratulations! You won the Dutch auction!', 'success')
             elif auction.auction_type == AuctionType.CLOSED:
+                # For closed auctions, we don't update the current price
                 if bid_amount <= auction.starting_price:
                     flash('Your bid must be higher than the starting price.', 'danger')
                 elif user.xtr_balance < bid_amount:
@@ -223,7 +224,7 @@ async def close_auctions():
 
         for auction in ended_auctions:
             if auction.auction_type == AuctionType.EVERLASTING:
-                continue
+                continue  # Skip everlasting auctions
 
             auction.is_active = False
             logger.info(f"Closing auction {auction.id}: {auction.title}")
@@ -255,37 +256,30 @@ async def close_auctions():
         db_session.rollback()
 
 async def update_dutch_auctions():
-    try:
-        dutch_auctions = db_session.query(Auction).filter(
-            Auction.is_active == True,
-            Auction.auction_type == AuctionType.DUTCH
-        ).all()
+    current_time = datetime.utcnow()
+    dutch_auctions = db_session.query(Auction).filter(
+        Auction.is_active == True,
+        Auction.auction_type == AuctionType.DUTCH
+    ).all()
 
-        for auction in dutch_auctions:
-            current_time = datetime.utcnow()
-            time_elapsed = (current_time - auction.end_time).total_seconds()
-            intervals_passed = int(time_elapsed / auction.dutch_interval)
-            new_price = max(0, auction.starting_price - (intervals_passed * auction.dutch_price_decrement))
-            
-            if new_price <= 0:
-                auction.is_active = False
-                logger.info(f"Dutch auction {auction.id} ended without a winner")
-            else:
-                auction.current_dutch_price = new_price
+    for auction in dutch_auctions:
+        time_elapsed = (current_time - auction.end_time).total_seconds()
+        intervals_passed = int(time_elapsed / auction.dutch_interval)
+        new_price = max(0, auction.starting_price - (intervals_passed * auction.dutch_price_decrement))
+        
+        if new_price <= 0:
+            auction.is_active = False
+            logger.info(f"Dutch auction {auction.id} ended without a winner")
+        else:
+            auction.current_dutch_price = new_price
 
-        db_session.commit()
-        logger.info("Successfully updated Dutch auctions")
-    except SQLAlchemyError as e:
-        db_session.rollback()
-        logger.error(f"Error updating Dutch auctions: {str(e)}")
-    finally:
-        db_session.close()
+    db_session.commit()
 
 async def main():
     bot_application = setup_bot()
     scheduler = AsyncIOScheduler()
     scheduler.add_job(close_auctions, 'interval', minutes=1)
-    scheduler.add_job(update_dutch_auctions, 'interval', seconds=10)
+    scheduler.add_job(update_dutch_auctions, 'interval', seconds=10)  # Update Dutch auctions every 10 seconds
     scheduler.start()
 
     async def start_bot():

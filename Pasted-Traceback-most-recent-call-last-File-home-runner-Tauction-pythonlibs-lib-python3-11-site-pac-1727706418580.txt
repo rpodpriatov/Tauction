@@ -1,0 +1,58 @@
+Traceback (most recent call last):
+  File "/home/runner/Tauction/.pythonlibs/lib/python3.11/site-packages/apscheduler/executors/base_py3.py", line 30, in run_coroutine_job
+    retval = await job.func(*job.args, **job.kwargs)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/Tauction/app.py", line 247, in update_dutch_auctions
+    dutch_auctions = db_session.query(Auction).filter(
+      ^^^^^
+  File "/home/runner/Tauction/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2673, in all
+    return self._iter().all()  # type: ignore
+           ^^^^^^^^^^^^
+  File "/home/runner/Tauction/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/query.py", line 2827, in _iter
+    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
+                                                  ^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/Tauction/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2362, in execute
+    return self._execute_internal(
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/Tauction/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/session.py", line 2247, in _execute_internal
+    result: Result[Any] = compile_state_cls.orm_execute_statement(
+                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/Tauction/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/orm/context.py", line 305, in orm_execute_statement
+    result = conn.execute(
+             ^^^^^^^^^^^^^
+  File "/home/runner/Tauction/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1418, in execute
+    return meth(
+           ^^^^^
+  File "/home/runner/Tauction/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/sql/elements.py", line 515, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/Tauction/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1640, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/Tauction/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1846, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/runner/Tauction/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1986, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/home/runner/Tauction/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 2355, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/home/runner/Tauction/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/runner/Tauction/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 941, in do_execute
+    cursor.execute(statement, parameters)
+sqlalchemy.exc.InternalError: (psycopg2.errors.InFailedSqlTransaction) current transaction is aborted, commands ignored until end of transaction block
+
+[SQL: SELECT auctions.id AS auctions_id, auctions.title AS auctions_title, auctions.description AS auctions_description, auctions.starting_price AS auctions_starting_price, auctions.current_price AS auctions_current_price, auctions.end_time AS auctions_end_time, auctions.is_active AS auctions_is_active, auctions.creator_id AS auctions_creator_id, auctions.auction_type AS auctions_auction_type, auctions.current_dutch_price AS auctions_current_dutch_price, auctions.dutch_price_decrement AS auctions_dutch_price_decrement, auctions.dutch_interval AS auctions_dutch_interval 
+FROM auctions 
+WHERE auctions.is_active = true AND auctions.auction_type = %(auction_type_1)s]
+[parameters: {'auction_type_1': 'DUTCH'}]
+(Background on this error at: https://sqlalche.me/e/20/2j85)
+2024-09-30 14:26:17,295 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot7942908605:AAHohHYUAUNBklq0CoY2Drhl6x6jROHWxj8/getUpdates "HTTP/1.1 200 OK"
+2024-09-30 14:26:18,046 - apscheduler.executors.default - INFO - Running job "update_dutch_auctions (trigger: interval[0:00:10], next run at: 2024-09-30 14:26:28 UTC)" (scheduled at 2024-09-30 14:26:18.045169+00:00)
+2024-09-30 14:26:18,103 - apscheduler.executors.default - ERROR - Job "update_dutch_auctions (trigger: interval[0:00:10], next run at: 2024-09-30 14:26:28 UTC)" raised an exception
+Traceback (most recent call last):
+  File "/home/runner/Tauction/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/engine/base.py", line 1967, in _exec_single_context
+    self.dialect.do_execute(
+  File "/home/runner/Tauction/.pythonlibs/lib/python3.11/site-packages/sqlalchemy/engine/default.py", line 941, in do_execute
+    cursor.execute(statement, parameters)
+psycopg2.errors.InFailedSqlTransaction: current transaction is aborted, commands ignored until end of transaction block
