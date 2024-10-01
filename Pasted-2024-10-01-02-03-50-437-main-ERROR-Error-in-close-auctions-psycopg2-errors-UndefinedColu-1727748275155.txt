@@ -1,0 +1,21 @@
+2024-10-01 02:03:50,437 - __main__ - ERROR - Error in close_auctions: (psycopg2.errors.UndefinedColumn) column auctions.starting_price does not exist
+LINE 1: ...le, auctions.description AS auctions_description, auctions.s...
+                                                             ^
+
+[SQL: SELECT auctions.id AS auctions_id, auctions.title AS auctions_title, auctions.description AS auctions_description, auctions.starting_price AS auctions_starting_price, auctions.current_price AS auctions_current_price, auctions.end_time AS auctions_end_time, auctions.is_active AS auctions_is_active, auctions.creator_id AS auctions_creator_id, auctions.auction_type AS auctions_auction_type, auctions.current_dutch_price AS auctions_current_dutch_price, auctions.dutch_price_decrement AS auctions_dutch_price_decrement, auctions.dutch_interval AS auctions_dutch_interval 
+FROM auctions 
+WHERE auctions.end_time <= %(end_time_1)s AND auctions.is_active = true]
+[parameters: {'end_time_1': datetime.datetime(2024, 10, 1, 2, 3, 50, 253624)}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
+2024-10-01 02:03:50,493 - apscheduler.executors.default - INFO - Job "close_auctions (trigger: interval[0:01:00], next run at: 2024-10-01 02:04:50 UTC)" executed successfully
+2024-10-01 02:03:50,494 - apscheduler.executors.default - INFO - Running job "update_dutch_auctions (trigger: interval[0:00:10], next run at: 2024-10-01 02:04:00 UTC)" (scheduled at 2024-10-01 02:03:50.239727+00:00)
+2024-10-01 02:03:50,494 - __main__ - INFO - Starting update_dutch_auctions
+2024-10-01 02:03:50,720 - __main__ - ERROR - Error in update_dutch_auctions: (psycopg2.errors.UndefinedColumn) column auctions.starting_price does not exist
+LINE 1: ...le, auctions.description AS auctions_description, auctions.s...
+                                                             ^
+
+[SQL: SELECT auctions.id AS auctions_id, auctions.title AS auctions_title, auctions.description AS auctions_description, auctions.starting_price AS auctions_starting_price, auctions.current_price AS auctions_current_price, auctions.end_time AS auctions_end_time, auctions.is_active AS auctions_is_active, auctions.creator_id AS auctions_creator_id, auctions.auction_type AS auctions_auction_type, auctions.current_dutch_price AS auctions_current_dutch_price, auctions.dutch_price_decrement AS auctions_dutch_price_decrement, auctions.dutch_interval AS auctions_dutch_interval 
+FROM auctions 
+WHERE auctions.is_active = true AND auctions.auction_type = %(auction_type_1)s]
+[parameters: {'auction_type_1': 'DUTCH'}]
+(Background on this error at: https://sqlalche.me/e/20/f405)
