@@ -39,6 +39,10 @@ args = "Reset Migrations"
 task = "workflow.run"
 args = "Apply Migrations"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Delete Migrations"
+
 [[workflows.workflow]]
 name = "Start Flask App"
 author = "agent"
@@ -117,6 +121,17 @@ agentRequireRestartOnSave = false
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "flask db upgrade"
+
+[[workflows.workflow]]
+name = "Delete Migrations"
+author = "agent"
+
+[workflows.workflow.metadata]
+agentRequireRestartOnSave = false
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python delete_migrations.py"
 
 [deployment]
 run = ["sh", "-c", "python app.py"]
