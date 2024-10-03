@@ -27,6 +27,7 @@ class User(UserMixin, Base):
     auctions = relationship('Auction', back_populates='creator')
     bids = relationship('Bid', back_populates='bidder')
     watchlist = relationship('Auction', secondary=watchlist, back_populates='watchers')
+    is_active = Column(Boolean, default=True)  # Добавлено поле is_active
 
 class Auction(Base):
     __tablename__ = 'auctions'
@@ -61,3 +62,4 @@ class Subscriber(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey('users.id'))
     subscription_end = Column(DateTime)
+
